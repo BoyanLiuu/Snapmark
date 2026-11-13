@@ -11,8 +11,8 @@ export interface EditorBarProps {
   fileName: string;
   naturalWidth: number;
   naturalHeight: number;
-  /** 1 = one image pixel per CSS pixel. */
-  zoom: number;
+  /** Screen px per image px (1 = one image pixel per CSS pixel); null until the first frame. */
+  zoom: number | null;
   tool: ToolId;
   onToolChange: (tool: ToolId) => void;
 }
@@ -100,7 +100,7 @@ export const EditorBar = ({
           <Minus />
         </Button>
         <output className="min-w-[15ch] px-2 text-center font-mono text-sm whitespace-nowrap text-ink-2 tabular-nums">
-          {nbsp(`${Math.round(zoom * 100)}% · ${size}`)}
+          {nbsp(zoom === null ? size : `${Math.round(zoom * 100)}% · ${size}`)}
         </output>
         <Button
           variant="ghost"

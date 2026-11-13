@@ -3,10 +3,12 @@
  * pixel density and redrawn through one render loop.
  *
  * This is the only module that knows about device pixels. It is the only reader of
- * `window.devicePixelRatio` and holds the only call that sets a canvas transform
- * (ARCHITECTURE.md §4). Draw callbacks work in CSS px; from M2 the base layer works in image px.
+ * `window.devicePixelRatio`, it builds the device matrix, and it holds the only call that sets a
+ * canvas transform (ARCHITECTURE.md §4). The base layer is drawn in image px through the camera;
+ * the overlay is drawn in screen px, for affordances that keep their size at any zoom.
  */
 
+import { M, type Camera } from "@/geom/matrix";
 import { createRenderLoop } from "./loop";
 
 export type Layer = "base" | "overlay";
@@ -21,6 +23,7 @@ export interface ViewSize {
 
 export interface ViewStats {
   size: ViewSize;
+  camera: Camera;
   /** The backing store of both canvases, in device px. */
   backing: { width: number; height: number };
   /** Animation frames drawn so far. */
@@ -29,14 +32,24 @@ export interface ViewStats {
   overlayDraws: number;
 }
 
-export type DrawLayer = (ctx: CanvasRenderingContext2D, size: ViewSize) => void;
+export interface Frame {
+  size: ViewSize;
+  /** The camera this frame was drawn with; pointer events must be read through the same one. */
+  camera: Camera;
+}
+
+export type DrawLayer = (ctx: CanvasRenderingContext2D, frame: Frame) => void;
 
 export interface ViewOptions {
   /** The element the canvases fill. Its size drives theirs, never the reverse. */
   container: HTMLElement;
   base: HTMLCanvasElement;
   overlay: HTMLCanvasElement;
+  /** The camera for a view of this size. Read once per frame. */
+  camera: (size: ViewSize) => Camera;
+  /** Draws in image px: the context already carries the camera and the pixel ratio. */
   drawBase: DrawLayer;
+  /** Draws in screen px: handles, guides and anything else sized in CSS px. */
   drawOverlay: DrawLayer;
   /** Called after every frame. */
   onFrame?: (stats: ViewStats) => void;
@@ -45,7 +58,7 @@ export interface ViewOptions {
 const readDpr = () => window.devicePixelRatio || 1;
 
 /** Backing-store size, in device px, for a canvas shown at `cssW × cssH` CSS px. */
-export const backingSize = ({ cssW, cssH, dpr }: ViewSize) => ({
+const backingSize = ({ cssW, cssH, dpr }: ViewSize) => ({
   width: Math.round(cssW * dpr),
   height: Math.round(cssH * dpr),
 });
@@ -54,7 +67,7 @@ export const backingSize = ({ cssW, cssH, dpr }: ViewSize) => ({
  * Size one canvas: the backing store in device px, the element in CSS px, on both axes. Returns
  * whether the backing store changed, which clears the canvas and resets its context.
  */
-export const sizeCanvas = (canvas: HTMLCanvasElement, size: ViewSize) => {
+const sizeCanvas = (canvas: HTMLCanvasElement, size: ViewSize) => {
   const { width, height } = backingSize(size);
   canvas.style.width = `${size.cssW}px`;
   canvas.style.height = `${size.cssH}px`;
@@ -64,12 +77,27 @@ export const sizeCanvas = (canvas: HTMLCanvasElement, size: ViewSize) => {
   return true;
 };
 
-/** Point a context at CSS px and clear it. Every layer starts its frame here. */
-const beginLayer = (ctx: CanvasRenderingContext2D, { dpr }: ViewSize) => {
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // Cleared in CSS px by the backing store's own dimensions, which over-cover it: the backing
-  // size was rounded, so `cssW × cssH` can fall half a device pixel short.
+/** The overlay's camera: screen px are its own units. */
+const SCREEN: Camera = { scale: 1, tx: 0, ty: 0 };
+const IDENTITY: DOMMatrix2DInit = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+
+/**
+ * Device px per image px: `M`, then the pixel ratio. Painting uses this; pointer events never do,
+ * because their coordinates are already CSS px. Using it for both puts every click at twice the
+ * distance from the origin on a Retina screen.
+ */
+export const deviceMatrix = (camera: Camera, dpr: number) =>
+  new DOMMatrix([dpr, 0, 0, dpr, 0, 0]).multiplySelf(M(camera));
+
+/** The one place a canvas transform is set. */
+const setMatrix = (ctx: CanvasRenderingContext2D, matrix: DOMMatrix2DInit) =>
+  ctx.setTransform(matrix);
+
+/** Clear a layer in device px, then point it at the matrix it is drawn through. */
+const beginLayer = (ctx: CanvasRenderingContext2D, matrix: DOMMatrix2DInit) => {
+  setMatrix(ctx, IDENTITY);
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  setMatrix(ctx, matrix);
 };
 
 /**
@@ -96,6 +124,7 @@ export const createView = ({
   container,
   base,
   overlay,
+  camera: cameraFor,
   drawBase,
   drawOverlay,
   onFrame,
@@ -106,22 +135,26 @@ export const createView = ({
     throw new Error("This browser has no 2D canvas.");
 
   let size: ViewSize = { cssW: 0, cssH: 0, dpr: readDpr() };
+  let camera = cameraFor(size);
   let baseDraws = 0;
   let overlayDraws = 0;
 
   const loop = createRenderLoop<Layer>((dirty) => {
+    camera = cameraFor(size);
+    const frame: Frame = { size, camera };
     if (dirty.has("base")) {
-      beginLayer(baseCtx, size);
-      drawBase(baseCtx, size);
+      beginLayer(baseCtx, deviceMatrix(camera, size.dpr));
+      drawBase(baseCtx, frame);
       baseDraws += 1;
     }
     if (dirty.has("overlay")) {
-      beginLayer(overlayCtx, size);
-      drawOverlay(overlayCtx, size);
+      beginLayer(overlayCtx, deviceMatrix(SCREEN, size.dpr));
+      drawOverlay(overlayCtx, frame);
       overlayDraws += 1;
     }
     onFrame?.({
       size,
+      camera,
       backing: { width: base.width, height: base.height },
       frames: loop.frames,
       baseDraws,
@@ -152,6 +185,8 @@ export const createView = ({
   const unwatchDpr = watchDpr(() => resize(size.cssW, size.cssH));
 
   return {
+    /** The camera of the latest frame, for reading pointer events with `toImage`. */
+    camera: () => camera,
     /** Redraw the given layers on the next frame; both when none are given. */
     invalidate: (...layers: Layer[]) =>
       loop.invalidate(

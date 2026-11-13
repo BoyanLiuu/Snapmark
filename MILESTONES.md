@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-12, M1 — `pnpm check` green (format, typecheck, lint, 5 unit tests,
-build); `pnpm test:e2e` 16 passed (4 canvas checks and 4 shell checks, each at 2x and 1x).
+**Last verified:** 2026-11-13, M2 — `pnpm check` green (format, typecheck, lint, 10 unit tests,
+build); `pnpm test:e2e` 18 passed (5 canvas checks and 4 shell checks, each at 2x and 1x).
 
 ---
 
@@ -53,7 +53,7 @@ Build:
 - [x] One `requestAnimationFrame` loop driven by per-layer dirty flags, not a timer —
       `src/render/loop.ts`
 - [x] A hard-coded square on `base` (with a one-device-pixel hairline), handles and a pointer
-      crosshair on `overlay` — `src/render/demo.ts`, replaced by a sample image in M2
+      crosshair on `overlay` (the square was replaced by the M2 test chart)
 - [x] A `ResizeObserver` that re-sizes and redraws, plus a re-size when the window moves to a
       display with a different pixel ratio
 
@@ -74,7 +74,7 @@ Worth a look by eye (not automatable):
 
 - [ ] On your Retina screen, the hairline inside the square is a single sharp line, not soft
 - [ ] Drag the window between the laptop screen and an external 1x monitor; with `?debug` the
-      readout's ratio changes and stays ✓ (Chrome's emulation can't automate this: it changes the
+      readout's ratio and backing store follow (Chrome's emulation can't automate this: it changes the
       ratio without firing the event a real move fires)
 
 Commit: `scaffold: two-canvas render loop with DPR-correct sizing`
@@ -116,14 +116,33 @@ Worth a look by eye:
 
 Commit: `shell: screen 09 laid out, controls in place, nothing wired`
 
-## M2 — The coordinate chain · gate
+## M2 — The coordinate chain · gate ✅
 
-- [ ] `geom/matrix.ts`: `M` from the camera, `Mi = M.invertSelf()`, `toImage` and `toScreen`;
-      only `M` is exported
-- [ ] `geom/camera.ts`: `fit(nat, view)` with 5% breathing room
-- [ ] The device matrix (`dpr` folded in) used only in `render/view.ts`, in the one call that sets
-      the transform
-- [ ] Vitest: `toImage(toScreen(p)) ≈ p` within `1e-9` across 5 scales × 3 DPRs × non-zero pan
-- [ ] `model/types.ts` opens with: _ALL geometry is image space._
-- [ ] A generated 3840 × 2407 test chart replaces M0's square, drawn through `M` at `fit()`
-- [ ] The status strip's `Pointer off` becomes the image pixel under the cursor, `x 2964 y 939`
+Build:
+
+- [x] `geom/matrix.ts`: `M` from the camera (scale, then pan), `toScreen`, and `toImage` through
+      `M`'s inverse; the only module besides the view that builds a matrix
+- [x] `geom/camera.ts`: `fit(nat, view)`, whole and centred with 5% breathing room
+- [x] The device matrix (`M` with `dpr` in front) built and used only in `render/view.ts`, through
+      the one call that sets a transform
+- [x] `model/types.ts` opens with: _ALL geometry is image space._
+- [x] A generated 3840 × 2407 test chart with landmarks A (2964, 939) and B (640, 1800), drawn
+      through the camera at `fit()` — `render/test-chart.ts`
+- [x] The status strip reads the image pixel under the pointer, `x 2964 y 939`, and `Pointer off`
+      when it leaves; the zoom readout shows the real fitted scale
+
+Check (`src/geom/*.test.ts`, `tests/architecture.test.ts`, `e2e/canvas.spec.ts` at 2x and 1x):
+
+- [x] The round trip holds within `1e-9` across 5 scales × 3 pixel ratios × a non-zero pan,
+      through the whole chain (image → device → screen → image), and `M` is scale-then-pan
+- [x] One `setTransform` in `src/`, in `render/view.ts`; `devicePixelRatio` read nowhere else;
+      `DOMMatrix` only in `geom/matrix.ts` and `render/view.ts`
+- [x] Hovering each landmark where it was painted reads its known coordinates, at 2x and at 1x,
+      and again after a resize. Proven by mutation: it fails at 2x (and passes at 1x) when the
+      pointer is read through the device matrix, and when the base is painted without the ratio
+
+Worth a look by eye:
+
+- [ ] On your Retina screen, hover A and B and read the strip
+
+Commit: `geom: image/screen/device coordinate chain with invertibility test`

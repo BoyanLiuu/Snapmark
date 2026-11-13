@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 const root = join(import.meta.dirname, "..");
 const VIEW = "src/render/view.ts";
+const MATRIX = "src/geom/matrix.ts";
 
 const sourceFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -32,6 +33,16 @@ describe("device pixels stay in the view", () => {
     const found = hits("setTransform");
     expect(found).toHaveLength(1);
     expect(found[0]).toMatch(new RegExp(`^${VIEW}:`));
+  });
+
+  it("builds matrices only in geom/matrix.ts (M) and the view (the device matrix)", () => {
+    const found = hits("DOMMatrix");
+    expect(found.length).toBeGreaterThan(0);
+    expect(
+      found.filter(
+        (hit) => !hit.startsWith(`${VIEW}:`) && !hit.startsWith(`${MATRIX}:`),
+      ),
+    ).toEqual([]);
   });
 
   it("reads devicePixelRatio only in the view", () => {

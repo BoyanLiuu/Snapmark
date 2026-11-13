@@ -1,6 +1,6 @@
 /**
- * The design file's sample data for screen 09, shown by the M1 shell until the real thing exists.
- * Kept in one file so it is deleted in one place: the image facts go in M3, the layers in M15.
+ * The design file's sample data for screen 09, shown until the real thing exists. Kept in one
+ * file so it is deleted in one place: the layers and the status line go in M4 and M15.
  */
 
 export type LayerKind = "arrow" | "text" | "rect" | "pixelate" | "highlight";
@@ -12,13 +12,6 @@ export interface SampleLayer {
   /** Size in image px, as the layer list shows it. */
   dims: string;
 }
-
-export const SAMPLE_IMAGE = {
-  name: "Market-at-Third.jpg",
-  naturalWidth: 3840,
-  naturalHeight: 2407,
-  zoom: 0.24,
-};
 
 /** Top of the paint order first, as the layer list reads. */
 export const SAMPLE_LAYERS: SampleLayer[] = [

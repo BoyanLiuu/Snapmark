@@ -6,8 +6,8 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M1 of M0–M19 done: the editor is laid out around a working canvas, nothing is wired
-yet. See [MILESTONES.md](MILESTONES.md).
+**Status:** M0–M2 of M0–M19 done: the editor is laid out, and a test chart is drawn through a
+tested image ↔ screen ↔ device coordinate chain. No tool draws yet. See [MILESTONES.md](MILESTONES.md).
 
 ## Stack
 
@@ -41,8 +41,11 @@ src/
   app/                  Next.js: layout, page, globals.css (the design file's tokens)
   components/ui/        shadcn primitives
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
-                        (sample.ts holds the design file's sample data until M3 and M15)
-  render/               view.ts (the only code that knows device pixels), loop.ts, demo.ts
+                        (sample.ts holds the design file's sample layers until M15)
+  model/types.ts        ALL geometry is image space
+  geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit)
+  render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
+                        test-chart.ts
 scripts/                fetch-fonts.mjs
 tests/                  repo-wide architecture checks
 e2e/                    Playwright

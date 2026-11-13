@@ -1,10 +1,10 @@
 import type { Page } from "@playwright/test";
+import { LANDMARKS, LANDMARK_SIDE } from "../src/render/test-chart";
 import { expect, test } from "./fixtures";
 
 /**
- * M0's checks, at 2x and at 1x (see playwright.config.ts): the device-pixel bugs that are invisible
- * at 1x and certain at 2x. The square comes from render/demo.ts; M2 replaces it with a test chart,
- * and these pixel checks with checks against the chart.
+ * The render loop (M0) and the coordinate chain (M2), at 2x and at 1x (see playwright.config.ts):
+ * the device-pixel bugs are invisible at 1x and certain at 2x.
  */
 
 const canvasSizes = (page: Page) =>
@@ -39,60 +39,83 @@ const expectSized = async (page: Page) => {
   }
 };
 
-/**
- * The base canvas's middle row, through the square and its hairline: the distinct RGBA values on
- * it, and where the drawing starts and ends, in device px.
- */
-const middleRow = (page: Page) =>
-  page.evaluate(() => {
+/** Where the base canvas painted a colour: the centre of its pixels, in device px. */
+const findPainted = (page: Page, colour: readonly number[]) =>
+  page.evaluate((target) => {
     const canvas = document.querySelector<HTMLCanvasElement>(
       'canvas[data-layer="base"]',
     )!;
-    const ctx = canvas.getContext("2d")!;
-    const row = ctx.getImageData(
-      0,
-      Math.floor(canvas.height / 2),
-      canvas.width,
-      1,
-    ).data;
-    const colours = new Set<string>();
-    let first = -1;
-    let last = -1;
-    for (let i = 0; i < row.length; i += 4) {
-      colours.add(row.slice(i, i + 4).join(","));
-      if (row[i + 3] > 0) {
-        if (first < 0) first = i / 4;
-        last = i / 4;
+    const { data, width } = canvas
+      .getContext("2d")!
+      .getImageData(0, 0, canvas.width, canvas.height);
+    let sx = 0;
+    let sy = 0;
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (
+        Math.abs(data[i] - target[0]) <= 2 &&
+        Math.abs(data[i + 1] - target[1]) <= 2 &&
+        Math.abs(data[i + 2] - target[2]) <= 2
+      ) {
+        const n = i / 4;
+        sx += (n % width) + 0.5;
+        sy += Math.floor(n / width) + 0.5;
+        count += 1;
       }
     }
-    return { colours: [...colours], first, last };
-  });
+    return count ? { x: sx / count, y: sy / count, count } : null;
+  }, colour);
 
-/** Sharp and in the right place: also catches a pixel ratio missing from the canvas transform. */
-const expectCrispSquare = async (page: Page) => {
-  const { colours, first, last } = await middleRow(page);
-  // Transparent, the orange frame, the fill and the hairline. A soft edge or a smeared hairline
-  // would add blended values.
-  expect(colours.length, colours.join(" | ")).toBeLessThanOrEqual(4);
-  // The 240 CSS px square plus its frame's outer CSS px each side, centred on whole CSS px.
-  const [{ cssW, dpr }] = await canvasSizes(page);
-  expect(first).toBe((Math.round((cssW - 240) / 2) - 1) * dpr);
-  expect(last - first + 1).toBe(242 * dpr);
+/**
+ * Hover where each landmark was painted and read the image pixel the app reports there. This is
+ * the whole chain in a real browser: painting goes image → device px, the pointer comes back
+ * screen → image px, and the two only agree if the pixel ratio is in the first and not the second.
+ */
+const expectLandmarksRead = async (page: Page) => {
+  const canvas = page.locator('canvas[data-layer="overlay"]');
+  const readout = page.getByTestId("cursor-readout");
+  const dpr = await page.evaluate(() => window.devicePixelRatio);
+  for (const { name, x, y, colour } of LANDMARKS) {
+    await expect
+      .poll(() => findPainted(page, colour), `${name} is painted`)
+      .not.toBeNull();
+    const painted = (await findPainted(page, colour))!;
+    const box = (await canvas.boundingBox())!;
+    await page.mouse.move(box.x + painted.x / dpr, box.y + painted.y / dpr);
+    // One screen px covers this many image px at the fitted zoom; the readout may be off by that.
+    const imagePxPerScreenPx = LANDMARK_SIDE / (Math.sqrt(painted.count) / dpr);
+    const tolerance = Math.ceil(imagePxPerScreenPx) + 1;
+    await expect
+      .poll(async () => {
+        const match = (await readout.textContent())?.match(
+          /x\s(-?\d+)\sy\s(-?\d+)/,
+        );
+        if (!match) return Infinity;
+        return Math.max(
+          Math.abs(Number(match[1]) - x),
+          Math.abs(Number(match[2]) - y),
+        );
+      }, `${name} reads x ${x} y ${y}`)
+      .toBeLessThanOrEqual(tolerance);
+  }
+  await page.mouse.move(1, 1);
+  await expect(readout).toHaveText("Pointer off");
 };
 
 const stat = async (
   page: Page,
   name: "frames" | "base-draws" | "overlay-draws",
-) =>
-  Number(await page.getByTestId("render-stats").getAttribute(`data-${name}`));
+) => Number(await page.getByTestId("stage").getAttribute(`data-${name}`));
 
+/** The first frame has drawn, the chart is on it, and nothing scheduled is still pending. */
 const settle = async (page: Page) => {
-  // The strip carries the counters once the first frame has drawn.
-  await expect(page.getByTestId("render-stats")).toHaveAttribute(
+  await expect(page.getByTestId("stage")).toHaveAttribute(
     "data-frames",
     /^[1-9]/,
   );
-  // Two animation frames, so anything already scheduled has drawn.
+  await expect
+    .poll(() => findPainted(page, LANDMARKS[0].colour))
+    .not.toBeNull();
   await page.evaluate(
     () =>
       new Promise((done) =>
@@ -106,17 +129,20 @@ test.beforeEach(async ({ page }) => {
   await settle(page);
 });
 
-test("the canvases are sized to the display, and the square is sharp", async ({
-  page,
-}, testInfo) => {
+test("the canvases are sized to the display", async ({ page }, testInfo) => {
   expect(await page.evaluate(() => window.devicePixelRatio)).toBe(
     testInfo.project.use.deviceScaleFactor,
   );
   await expectSized(page);
-  await expectCrispSquare(page);
 });
 
-test("resizing the window re-sizes and redraws the canvases", async ({
+test("each landmark reads its own image pixel under the pointer", async ({
+  page,
+}) => {
+  await expectLandmarksRead(page);
+});
+
+test("after a resize, the canvases re-size and the landmarks still read true", async ({
   page,
 }) => {
   const [before] = await canvasSizes(page);
@@ -126,7 +152,7 @@ test("resizing the window re-sizes and redraws the canvases", async ({
     .toBeLessThan(before.cssW);
   await settle(page);
   await expectSized(page);
-  await expectCrispSquare(page);
+  await expectLandmarksRead(page);
 });
 
 test("an idle page draws no frames", async ({ page }) => {
