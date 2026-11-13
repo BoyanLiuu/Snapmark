@@ -49,6 +49,12 @@ type SwatchId = (typeof SWATCHES)[number]["id"];
 export const defaultStroke = (naturalWidth: number) =>
   Math.max(2, Math.round(naturalWidth / 400));
 
+/** Why the default is what it is, with the arithmetic, as the design file shows it. */
+const strokeReason = (naturalWidth: number, stroke: number) =>
+  Math.round(naturalWidth / 400) >= 2
+    ? `${stroke}\u00a0px is this image’s width ÷ 400.`
+    : `${stroke}\u00a0px is the thinnest default, used for images under 600\u00a0px wide.`;
+
 const labelClass = "text-sm font-medium text-muted-foreground";
 
 const RangeField = ({
@@ -151,7 +157,7 @@ export const Inspector = ({ naturalWidth }: { naturalWidth: number }) => {
         min={1}
         max={60}
         unit={"\u00a0px"}
-        help={`Image pixels, so it exports at this width at any zoom. ${initialStroke}\u00a0px is this image’s width ÷ 400.`}
+        help={`Image pixels, so it exports at this width at any zoom. ${strokeReason(naturalWidth, initialStroke)}`}
         onChange={setStroke}
       />
       <RangeField

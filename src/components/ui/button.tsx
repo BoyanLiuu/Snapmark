@@ -36,6 +36,8 @@ const buttonVariants = cva(
         // Snapmark's 36 px controls: text buttons and icon buttons.
         control: "h-9 gap-2 px-4 text-sm [&_svg:not([class*='size-'])]:size-4",
         "icon-control": "size-9 [&_svg:not([class*='size-'])]:size-5",
+        "control-lg":
+          "h-11 gap-2 px-6 text-base [&_svg:not([class*='size-'])]:size-5",
       },
     },
     defaultVariants: {

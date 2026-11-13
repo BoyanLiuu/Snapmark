@@ -10,17 +10,12 @@ import {
 import { fit } from "@/geom/camera";
 import { toImage } from "@/geom/matrix";
 import { createStore, type Store } from "@/lib/store";
-import type { Point, Size } from "@/model/types";
+import type { LoadedImage } from "@/model/image";
+import type { Point } from "@/model/types";
+import { drawImageLayer } from "@/render/image";
 import { drawOverlay } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
 import { RenderReadout, useDebug } from "./render-readout";
-
-/** What the stage shows: the decoded pixels, and the size the document measures them in. */
-export interface StageImage {
-  bitmap: ImageBitmap;
-  /** Natural size in image px. From M11 the bitmap may be a downscaled copy, so this is separate. */
-  natural: Size;
-}
 
 const POINTER_OFF = "Pointer off";
 
@@ -53,7 +48,7 @@ export const CanvasStage = ({
 }: {
   status: string;
   /** Null until the image has decoded. */
-  image: StageImage | null;
+  image: Pick<LoadedImage, "bitmap" | "natural"> | null;
   /** Called when the fitted scale changes (screen px per image px). */
   onZoomChange?: (scale: number) => void;
 }) => {
@@ -85,11 +80,9 @@ export const CanvasStage = ({
         imageRef.current
           ? fit(imageRef.current.natural, { w: size.cssW, h: size.cssH })
           : { scale: 1, tx: 0, ty: 0 },
-      drawBase: (ctx) => {
+      drawBase: (ctx, frame) => {
         const current = imageRef.current;
-        if (!current) return;
-        ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(current.bitmap, 0, 0);
+        if (current) drawImageLayer(ctx, frame, current.bitmap);
       },
       drawOverlay: (ctx, frame) => drawOverlay(ctx, frame, pointerRef.current),
       // Frames happen on every pointer move, so React only hears about them when the debug

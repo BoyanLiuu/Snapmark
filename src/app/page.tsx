@@ -1,5 +1,5 @@
-import { EditorShell } from "@/components/editor/editor-shell";
+import { App } from "@/components/app";
 
 export default function Home() {
-  return <EditorShell />;
+  return <App />;
 }

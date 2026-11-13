@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M2 — `pnpm check` green (format, typecheck, lint, 10 unit tests,
-build); `pnpm test:e2e` 18 passed (5 canvas checks and 4 shell checks, each at 2x and 1x).
+**Last verified:** 2026-11-13, M3 — `pnpm check` green (format, typecheck, lint, 22 unit tests,
+build); `pnpm test:e2e` 30 passed (5 canvas, 4 shell and 6 open checks, each at 2x and 1x).
 
 ---
 
@@ -127,7 +127,7 @@ Build:
       the one call that sets a transform
 - [x] `model/types.ts` opens with: _ALL geometry is image space._
 - [x] A generated 3840 × 2407 test chart with landmarks A (2964, 939) and B (640, 1800), drawn
-      through the camera at `fit()` — `render/test-chart.ts`
+      through the camera at `fit()` (since M3 an e2e fixture, `e2e/files/test-chart.png`)
 - [x] The status strip reads the image pixel under the pointer, `x 2964 y 939`, and `Pointer off`
       when it leaves; the zoom readout shows the real fitted scale
 
@@ -146,3 +146,43 @@ Worth a look by eye:
 - [ ] On your Retina screen, hover A and B and read the strip
 
 Commit: `geom: image/screen/device coordinate chain with invertibility test`
+
+## M3 — Open an image ✅
+
+Build:
+
+- [x] The open screen (01): headline, **Choose an image**, **Open the sample**, the help line, and a
+      figure of the sample photo's signature pixel (the corner of boat 14's number, 2136, 2651) at the fitted
+      zoom, 400% and 1:1 — `components/open/open-screen.tsx`, `hero.tsx`
+- [x] The sample is a landscape, rowboats on Lago di Braies (Luca Bravo, CC0), served from this
+      app and credited —
+      `model/sample.ts`, `public/samples/`
+- [x] Pick, drop anywhere, or paste — `components/open/use-image-input.ts`; the whole page shows
+      a drop state while a file is dragged over it (02)
+- [x] The format is told from the file's first bytes; PNG, JPEG and WebP decode with
+      `createImageBitmap(blob, { imageOrientation: "from-image" })` — `model/image.ts`
+- [x] Anything else is refused by name in the help line (03), and focus returns to
+      **Choose an image**; a damaged PNG/JPEG/WebP says so
+- [x] The editor shows the file's name and natural size; the sample strip and sample layers only
+      appear for the sample
+- [x] Fixtures in `e2e/files/` (1 px PNG, EXIF-rotated JPEG, HEIC), made by
+      `scripts/make-fixtures.mjs`
+
+Check (`src/model/image.test.ts`, `e2e/open.spec.ts` at 2x and 1x):
+
+- [x] Choosing a file opens it at its natural size (`1 × 1 px`)
+- [x] The EXIF-rotated photo opens upright: `200 × 400 px`, blue top-left. Proven with `flipY`
+      (Chromium now treats `"none"` as `"from-image"`)
+- [x] The HEIC is refused with its format named, and the page stays put
+- [x] A file dropped anywhere opens, with the drop state showing while it is dragged
+- [x] A pasted image opens
+- [x] The sample opens from this app, at 4554 × 3036, with its credit
+- [x] Format detection from bytes: PNG, JPEG, WebP, HEIC (two brands), AVIF, GIF, TIFF (both byte
+      orders), SVG, and unknown
+
+Worth a look by eye:
+
+- [ ] Copy a screenshot (⇧⌘⌃4 on a Mac), open the page, press ⌘V
+- [ ] Drag a photo from Finder onto the page
+
+Commit: `open: dropzone with pick, drop, paste and codec rejection`

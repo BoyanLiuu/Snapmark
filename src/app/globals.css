@@ -89,6 +89,8 @@
   --swatch-green: oklch(74% 0.17 150);
   --swatch-sky: oklch(74% 0.12 250);
   --swatch-white: oklch(97% 0.006 80);
+  /* The dimmed page under a file being dragged in. */
+  --veil: oklch(6.5% 0.007 75 / 0.72);
   /* Square corners everywhere, as in the design file. */
   --radius: 0;
 }

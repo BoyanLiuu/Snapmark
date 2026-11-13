@@ -36,6 +36,11 @@ export const LayerList = ({ layers }: { layers: SampleLayer[] }) => {
         <p className="text-sm text-muted-foreground">{plural(layers.length)}</p>
       </div>
 
+      {layers.length === 0 && (
+        <p className="py-6 text-sm text-ink-2">
+          Each box, arrow and label gets a row here, top first.
+        </p>
+      )}
       <ol className="-mx-3">
         {layers.map(({ id, kind, name, dims }) => {
           const Icon = KIND_ICON[kind];

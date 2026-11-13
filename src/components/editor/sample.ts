@@ -1,5 +1,6 @@
 /**
- * The design file's sample data for screen 09, shown until the real thing exists. Kept in one
+ * The design file's sample layers for screen 09, relabelled for the sample photo, shown until the
+ * real thing exists. Kept in one
  * file so it is deleted in one place: the layers and the status line go in M4 and M15.
  */
 
@@ -19,13 +20,13 @@ export const SAMPLE_LAYERS: SampleLayer[] = [
   {
     id: "Ra9Kx4Pd",
     kind: "text",
-    name: "Two bikes riding the crossing",
+    name: "Boat 14, the one we rented",
     dims: "795 wide",
   },
   {
     id: "Xt4Wd9Bn",
     kind: "text",
-    name: "Taxi waiting in the red transit-only lane",
+    name: "Oars and life jackets in the boathouse",
     dims: "583 wide",
   },
   { id: "Ce2Nj5Vu", kind: "rect", name: "Orange rectangle", dims: "678 × 300" },

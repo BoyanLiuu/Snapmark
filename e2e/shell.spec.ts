@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { openChart } from "./helpers";
 
 /**
  * M1's checks that outlast the shell. The layout itself was compared with the design file by eye;
@@ -6,7 +7,7 @@ import { expect, test } from "./fixtures";
  */
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await openChart(page);
 });
 
 test("Copy is the one orange button, and Export is not", async ({ page }) => {

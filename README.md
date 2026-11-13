@@ -6,8 +6,8 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M2 of M0–M19 done: the editor is laid out, and a test chart is drawn through a
-tested image ↔ screen ↔ device coordinate chain. No tool draws yet. See [MILESTONES.md](MILESTONES.md).
+**Status:** M0–M3 of M0–M19 done: open a PNG, JPEG or WebP by choosing, dropping or pasting it, and it
+is drawn upright through a tested coordinate chain. No tool draws yet. See [MILESTONES.md](MILESTONES.md).
 
 ## Stack
 
@@ -40,13 +40,17 @@ src/components/ui` to turn their `function` declarations into arrow functions.
 src/
   app/                  Next.js: layout, page, globals.css (the design file's tokens)
   components/ui/        shadcn primitives
+  components/app.tsx    open an image, then annotate it
+  components/open/      the open screen: pick, drop, paste, and the hero lenses
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
                         (sample.ts holds the design file's sample layers until M15)
   model/types.ts        ALL geometry is image space
+  model/image.ts        format from bytes, decode upright
+  model/sample.ts       the sample photo (public/samples/)
   geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit)
   render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
                         test-chart.ts
-scripts/                fetch-fonts.mjs
+scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart)
 tests/                  repo-wide architecture checks
 e2e/                    Playwright
 docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md
@@ -55,3 +59,11 @@ docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md
 The one rule to keep: **all annotation geometry is stored in image pixels**, and only
 `src/render/view.ts` knows about device pixels. `tests/architecture.test.ts` fails if a canvas
 transform or `devicePixelRatio` appears anywhere else.
+
+## Credits
+
+The sample photo, `public/samples/lago-di-braies.webp`, is
+[“Lago di Braies”](<https://commons.wikimedia.org/wiki/File:Lago_di_Braies_(Unsplash_VowIFDxogG4).jpg>)
+by [Luca Bravo](https://unsplash.com/@lucabravo), from Unsplash via Wikimedia Commons,
+[CC0](https://creativecommons.org/publicdomain/zero/1.0/), re-encoded as WebP. No credit is
+required; see `public/samples/CREDITS.txt`.

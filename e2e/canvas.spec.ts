@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
-import { LANDMARKS, LANDMARK_SIDE } from "../src/render/test-chart";
+import { LANDMARKS, LANDMARK_SIDE } from "./chart";
 import { expect, test } from "./fixtures";
+import { findPainted, openChart } from "./helpers";
 
 /**
  * The render loop (M0) and the coordinate chain (M2), at 2x and at 1x (see playwright.config.ts):
@@ -38,33 +39,6 @@ const expectSized = async (page: Page) => {
     expect(c.height, `${c.layer} height`).toBe(Math.round(c.cssH * c.dpr));
   }
 };
-
-/** Where the base canvas painted a colour: the centre of its pixels, in device px. */
-const findPainted = (page: Page, colour: readonly number[]) =>
-  page.evaluate((target) => {
-    const canvas = document.querySelector<HTMLCanvasElement>(
-      'canvas[data-layer="base"]',
-    )!;
-    const { data, width } = canvas
-      .getContext("2d")!
-      .getImageData(0, 0, canvas.width, canvas.height);
-    let sx = 0;
-    let sy = 0;
-    let count = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (
-        Math.abs(data[i] - target[0]) <= 2 &&
-        Math.abs(data[i + 1] - target[1]) <= 2 &&
-        Math.abs(data[i + 2] - target[2]) <= 2
-      ) {
-        const n = i / 4;
-        sx += (n % width) + 0.5;
-        sy += Math.floor(n / width) + 0.5;
-        count += 1;
-      }
-    }
-    return count ? { x: sx / count, y: sy / count, count } : null;
-  }, colour);
 
 /**
  * Hover where each landmark was painted and read the image pixel the app reports there. This is
@@ -125,7 +99,7 @@ const settle = async (page: Page) => {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+  await openChart(page);
   await settle(page);
 });
 
