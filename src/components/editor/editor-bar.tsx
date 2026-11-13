@@ -9,8 +9,8 @@ const nbsp = (s: string) => s.replaceAll(" ", "\u00a0");
 
 export interface EditorBarProps {
   fileName: string;
-  naturalWidth: number;
-  naturalHeight: number;
+  /** Natural size in image px; null while a file decodes and its size isn't known yet. */
+  natural: { w: number; h: number } | null;
   /** Screen px per image px (1 = one image pixel per CSS pixel); null until the first frame. */
   zoom: number | null;
   tool: ToolId;
@@ -23,15 +23,17 @@ export interface EditorBarProps {
  */
 export const EditorBar = ({
   fileName,
-  naturalWidth,
-  naturalHeight,
+  natural,
   zoom,
   tool,
   onToolChange,
 }: EditorBarProps) => {
-  const size = `${naturalWidth} × ${naturalHeight}`;
+  const size = natural ? `${natural.w} × ${natural.h}` : "";
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b bg-background px-4 py-2">
+    <div
+      data-testid="editor-bar"
+      className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b bg-background px-4 py-2"
+    >
       <div className="grid max-w-72 min-w-0">
         <h1
           id="editor-file"
@@ -40,7 +42,7 @@ export const EditorBar = ({
           {fileName}
         </h1>
         <span className="font-mono text-xs text-muted-foreground tabular-nums">
-          {nbsp(`${size} px`)}
+          {natural ? nbsp(`${size} px`) : "Decoding…"}
         </span>
       </div>
 
@@ -100,7 +102,9 @@ export const EditorBar = ({
           <Minus />
         </Button>
         <output className="min-w-[15ch] px-2 text-center font-mono text-sm whitespace-nowrap text-ink-2 tabular-nums">
-          {nbsp(zoom === null ? size : `${Math.round(zoom * 100)}% · ${size}`)}
+          {nbsp(
+            zoom === null ? size : `${Math.round(zoom * 100)}% · ${size}`,
+          ) || "–"}
         </output>
         <Button
           variant="ghost"

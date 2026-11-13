@@ -10,7 +10,9 @@ test.beforeEach(async ({ page }) => {
   await openChart(page);
 });
 
-test("Copy is the one orange button, and Export is not", async ({ page }) => {
+test("Copy is the editor bar's one orange button, and Export is not", async ({
+  page,
+}) => {
   // The plan's rule: Copy is the primary action on every screen. Do not invert it.
   const background = (name: string) =>
     page
@@ -19,7 +21,9 @@ test("Copy is the one orange button, and Export is not", async ({ page }) => {
   const orange = await background("Copy");
   expect(orange).not.toBe("rgba(0, 0, 0, 0)");
   expect(await background("Export")).toBe("rgba(0, 0, 0, 0)");
+  // The empty state's "Draw a box" is orange too, as in the design; the rule is the bar's.
   const filled = await page
+    .getByTestId("editor-bar")
     .getByRole("button")
     .evaluateAll(
       (buttons, colour) =>

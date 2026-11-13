@@ -6,8 +6,9 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M3 of M0–M19 done: open a PNG, JPEG or WebP by choosing, dropping or pasting it, and it
-is drawn upright through a tested coordinate chain. No tool draws yet. See [MILESTONES.md](MILESTONES.md).
+**Status:** M0–M4 of M0–M19 done: open a PNG, JPEG or WebP and it decodes in place, upright, through a
+tested coordinate chain; the sample opens with annotations drawn. Drawing your own starts in M5.
+See [MILESTONES.md](MILESTONES.md).
 
 ## Stack
 

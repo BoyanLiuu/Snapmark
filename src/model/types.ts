@@ -89,4 +89,7 @@ export interface Doc {
   byId: ReadonlyMap<Id, Annotation>;
   /** Paint order, bottom to top. */
   order: readonly Id[];
+  openedAt: Date;
+  /** Null until something is drawn. */
+  editedAt: Date | null;
 }

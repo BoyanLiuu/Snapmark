@@ -121,7 +121,10 @@ const SAMPLE_ANNOTATIONS: Annotation[] = [
   },
 ];
 
-export const SAMPLE_DOC = createDoc(SAMPLE.size, SAMPLE_ANNOTATIONS);
+/** The sample's made-up history, as the design file's status line shows it. */
+const EDITED = new Date("2026-11-12T09:41:00Z");
 
-/** The sample's made-up history, for the status line. */
-export const SAMPLE_EDITED = "12 Nov 2026, 09:41 UTC";
+export const SAMPLE_DOC = createDoc(SAMPLE.size, SAMPLE_ANNOTATIONS, {
+  openedAt: EDITED,
+  editedAt: EDITED,
+});

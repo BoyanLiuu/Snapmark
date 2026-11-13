@@ -84,24 +84,36 @@ export type OpenResult =
 const ACCEPTED =
   "Snapmark opens PNG, JPEG and WebP: save it as one of those and try again.";
 
-export const decodeImage = async (
+export type FormatCheck =
+  { ok: true; format: Format } | { ok: false; reason: string };
+
+const fail = (reason: string): { ok: false; reason: string } => ({
+  ok: false,
+  reason,
+});
+
+/** Whether Snapmark can open this, from its first bytes. Fast, so it runs before anything else. */
+export const checkFormat = async (
   blob: Blob,
   name: string,
-): Promise<OpenResult> => {
-  const head = new Uint8Array(await blob.slice(0, SNIFF_BYTES).arrayBuffer());
-  const format = sniffFormat(head);
+): Promise<FormatCheck> => {
+  const format = sniffFormat(
+    new Uint8Array(await blob.slice(0, SNIFF_BYTES).arrayBuffer()),
+  );
   if (!format)
-    return {
-      ok: false,
-      reason: `${name} isn’t an image Snapmark can read. ${ACCEPTED}`,
-    };
+    return fail(`${name} isn’t an image Snapmark can read. ${ACCEPTED}`);
   if (!OPENS.has(format))
-    return {
-      ok: false,
-      reason: `${name} is a ${FORMAT_NAMES[format]} image. ${ACCEPTED}`,
-    };
+    return fail(`${name} is a ${FORMAT_NAMES[format]} image. ${ACCEPTED}`);
+  return { ok: true, format };
+};
+
+/** Decode a file `checkFormat` accepted, upright: EXIF orientation applied, so image space is what the user sees. */
+export const decodeBitmap = async (
+  blob: Blob,
+  name: string,
+  format: Format,
+): Promise<OpenResult> => {
   try {
-    // from-image applies the photo's EXIF orientation, so image space is what the user sees.
     const bitmap = await createImageBitmap(blob, {
       imageOrientation: "from-image",
     });
@@ -110,9 +122,16 @@ export const decodeImage = async (
       image: { name, bitmap, natural: { w: bitmap.width, h: bitmap.height } },
     };
   } catch {
-    return {
-      ok: false,
-      reason: `${name} looks like a ${FORMAT_NAMES[format]} but couldn’t be decoded; the file may be damaged.`,
-    };
+    return fail(
+      `${name} looks like a ${FORMAT_NAMES[format]} but couldn’t be decoded; the file may be damaged.`,
+    );
   }
+};
+
+export const decodeImage = async (
+  blob: Blob,
+  name: string,
+): Promise<OpenResult> => {
+  const check = await checkFormat(blob, name);
+  return check.ok ? decodeBitmap(blob, name, check.format) : check;
 };

@@ -8,6 +8,21 @@ import type { Id } from "@/model/types";
 import type { LayerRow } from "./layers";
 import { KIND_ICON } from "./tools";
 
+/** Three placeholder rows while the image decodes (screen 08). */
+const Skeleton = () => (
+  <div aria-hidden data-testid="layers-loading" className="-mx-3">
+    {[0, 1, 2].map((i) => (
+      <div
+        key={i}
+        className="flex h-10 items-center gap-3 border-b border-rule-2 px-3"
+      >
+        <span className="size-4 bg-rule-2" />
+        <span className="h-3 w-3/5 bg-border" />
+      </div>
+    ))}
+  </div>
+);
+
 const plural = (n: number) => `${n} annotation${n === 1 ? "" : "s"}`;
 
 /**
@@ -19,7 +34,8 @@ export const LayerList = ({
   hidden,
   onToggleHidden,
 }: {
-  layers: LayerRow[];
+  /** Null while the image decodes. */
+  layers: LayerRow[] | null;
   hidden: ReadonlySet<Id>;
   onToggleHidden: (id: Id) => void;
 }) => {
@@ -34,16 +50,21 @@ export const LayerList = ({
         >
           Layers
         </h2>
-        <p className="text-sm text-muted-foreground">{plural(layers.length)}</p>
+        {layers && (
+          <p className="text-sm text-muted-foreground">
+            {plural(layers.length)}
+          </p>
+        )}
       </div>
 
-      {layers.length === 0 && (
+      {layers === null && <Skeleton />}
+      {layers?.length === 0 && (
         <p className="py-6 text-sm text-ink-2">
           Each box, arrow and label gets a row here, top first.
         </p>
       )}
       <ol className="-mx-3">
-        {layers.map(({ id, kind, name, dims }) => {
+        {layers?.map(({ id, kind, name, dims }) => {
           const Icon = KIND_ICON[kind];
           const isSelected = selected === id;
           const isHidden = hidden.has(id);

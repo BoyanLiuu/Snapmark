@@ -7,12 +7,14 @@ import {
   useSyncExternalStore,
   type PointerEvent,
 } from "react";
+import { Button } from "@/components/ui/button";
 import { fit } from "@/geom/camera";
 import { toImage } from "@/geom/matrix";
 import { createStore, type Store } from "@/lib/store";
+import { useRefValue } from "@/lib/use-ref-value";
 import type { LoadedImage } from "@/model/image";
 import type { Doc } from "@/model/types";
-import type { Point } from "@/model/types";
+import type { Point, Size } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
 import { drawOverlay } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
@@ -37,6 +39,59 @@ const CursorReadout = ({ store }: { store: Store<string> }) => {
   );
 };
 
+const kbd =
+  "inline-block min-w-[1.6em] border px-1 text-center font-mono text-[0.85em] leading-normal text-ink-2";
+
+/** Screen 08: the image's frame, dashed, until its pixels arrive. Never an empty stage. */
+const DecodingPlate = ({
+  name,
+  natural,
+}: {
+  name: string;
+  natural: Size | null;
+}) => (
+  <div
+    role="status"
+    data-testid="decoding"
+    className="absolute inset-0 z-10 grid place-content-center justify-items-center gap-3 p-10 text-center"
+  >
+    <span
+      aria-hidden
+      style={{ aspectRatio: natural ? `${natural.w} / ${natural.h}` : "3 / 2" }}
+      className="block w-[min(60vw,720px)] max-w-full border border-dashed border-muted-foreground bg-card"
+    />
+    <p className="font-mono text-sm text-ink-2">
+      Decoding {natural ? `${natural.w}\u00a0×\u00a0${natural.h}` : name}
+    </p>
+  </div>
+);
+
+/**
+ * Screen 10: nothing drawn yet, and the first step. The pointer passes through everywhere but the
+ * button, so the cursor readout still works under it.
+ */
+const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
+  <div
+    data-testid="nothing-drawn"
+    className="pointer-events-none absolute bottom-10 left-1/2 z-10 grid w-[min(30rem,calc(100%-48px))] -translate-x-1/2 justify-items-center gap-2 border bg-background/80 p-10 text-center"
+  >
+    <h2 className="text-[1.44rem] leading-[1.05] font-medium tracking-[-0.04em]">
+      Nothing drawn on this image yet
+    </h2>
+    <p className="text-sm text-ink-2">
+      Drag across the picture with a tool. Rectangle is{" "}
+      <kbd className={kbd}>R</kbd>.
+    </p>
+    <Button
+      size="control"
+      className="pointer-events-auto mt-2"
+      onClick={onDrawBox}
+    >
+      Draw a box
+    </Button>
+  </div>
+);
+
 /**
  * The stage: the `base` and `overlay` canvases stacked in a container whose size the layout sets,
  * over the status strip (cursor readout and status line). The image is drawn fitted to the stage,
@@ -46,13 +101,19 @@ export const CanvasStage = ({
   status,
   image,
   doc,
+  decoding,
+  onDrawBox,
   onZoomChange,
 }: {
   status: string;
-  /** What is drawn on the image, in image px. */
-  doc: Doc;
   /** Null until the image has decoded. */
   image: Pick<LoadedImage, "bitmap" | "natural"> | null;
+  /** What is drawn on the image, in image px; null until it has decoded. */
+  doc: Doc | null;
+  /** While decoding: the file's name, and its size when known (screen 08). */
+  decoding: { name: string; natural: Size | null } | null;
+  /** The empty state's first step (screen 10): choose the rectangle. */
+  onDrawBox: () => void;
   /** Called when the fitted scale changes (screen px per image px). */
   onZoomChange?: (scale: number) => void;
 }) => {
@@ -62,9 +123,9 @@ export const CanvasStage = ({
   const viewRef = useRef<View | null>(null);
   // Read by the draws; kept out of React state so a frame re-renders nothing.
   const pointerRef = useRef<Point | null>(null);
-  const imageRef = useRef(image);
-  const docRef = useRef(doc);
-  const onZoomRef = useRef(onZoomChange);
+  const imageRef = useRefValue(image);
+  const docRef = useRefValue(doc);
+  const onZoomRef = useRefValue(onZoomChange);
   const [cursor] = useState(() => createStore(POINTER_OFF));
   const [stats, setStats] = useState<ViewStats | null>(null);
   const debug = useDebug();
@@ -87,7 +148,8 @@ export const CanvasStage = ({
           : { scale: 1, tx: 0, ty: 0 },
       drawBase: (ctx, frame) => {
         const current = imageRef.current;
-        if (current) drawImageLayer(ctx, frame, docRef.current, current.bitmap);
+        if (current && docRef.current)
+          drawImageLayer(ctx, frame, docRef.current, current.bitmap);
       },
       drawOverlay: (ctx, frame) => drawOverlay(ctx, frame, pointerRef.current),
       // Frames happen on every pointer move, so React only hears about them when the debug
@@ -108,21 +170,16 @@ export const CanvasStage = ({
       view.dispose();
       viewRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The refs are written after render; invalidating here means the next frame sees the new value.
   useEffect(() => {
-    imageRef.current = image;
     viewRef.current?.invalidate();
   }, [image]);
-
   useEffect(() => {
-    docRef.current = doc;
     viewRef.current?.invalidate("base");
   }, [doc]);
-
-  useEffect(() => {
-    onZoomRef.current = onZoomChange;
-  }, [onZoomChange]);
 
   useEffect(() => {
     debugRef.current = debug;
@@ -172,6 +229,10 @@ export const CanvasStage = ({
           onPointerMove={trackPointer}
           onPointerLeave={clearPointer}
         />
+        {decoding && <DecodingPlate {...decoding} />}
+        {image && doc && doc.order.length === 0 && (
+          <EmptyPlate onDrawBox={onDrawBox} />
+        )}
       </div>
 
       <div

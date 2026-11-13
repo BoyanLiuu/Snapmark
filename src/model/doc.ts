@@ -4,11 +4,17 @@ import type { Annotation, Doc, Id, Size } from "./types";
 export const createDoc = (
   natural: Size,
   annotations: readonly Annotation[] = [],
+  {
+    openedAt = new Date(),
+    editedAt = null,
+  }: { openedAt?: Date; editedAt?: Date | null } = {},
 ): Doc => ({
   naturalWidth: natural.w,
   naturalHeight: natural.h,
   byId: new Map(annotations.map((a) => [a.id, a])),
   order: annotations.map((a) => a.id),
+  openedAt,
+  editedAt,
 });
 
 /** The same document without some annotations: what the layer list's eye buttons hide. */

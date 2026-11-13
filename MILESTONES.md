@@ -33,8 +33,9 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M3 — `pnpm check` green (format, typecheck, lint, 22 unit tests,
-build); `pnpm test:e2e` 32 passed (5 canvas, 4 shell and 7 open checks, each at 2x and 1x).
+**Last verified:** 2026-11-13, M4 — `pnpm check` green (format, typecheck, lint, 22 unit tests,
+build); `pnpm test:e2e` 38 passed (5 canvas, 4 shell, 7 open and 3 annotator checks, each at 2x
+and 1x).
 
 ---
 
@@ -198,3 +199,26 @@ Added after review, at the user's request — the sample opens with annotations 
       passing the unfiltered document, which fails at 2x and 1x)
 
 Commit: `open: dropzone with pick, drop, paste and codec rejection`
+
+## M4 — The annotator states ✅
+
+Build:
+
+- [x] `drawScene(ctx, doc, bitmap, { minVisualStroke })`, the export's function too (done in M3)
+- [x] Decoding (08): the editor opens at once; the stage shows the image's frame, dashed, with
+      "Decoding 4554 × 3036" (or the file's name before its size is known); Layers shows skeleton
+      rows — `components/app.tsx`, `canvas-stage.tsx`
+- [x] A file is checked on the open screen first, so a refusal stays there; a decode that
+      finishes after going back, or after a newer open, is dropped and its bitmap closed
+- [x] Nothing drawn (10): a plate over the image, and **Draw a box** picks the rectangle
+- [x] The status line from the document: "7 annotations, last edited 12 Nov 2026, 09:41 UTC." or
+      "Nothing drawn yet. Opened …" — `components/editor/status.ts`
+
+Check (`e2e/annotator.spec.ts` at 2x and 1x):
+
+- [x] The image's frame shows while it decodes (the sample held in flight), then the image and the
+      status line
+- [x] Going back while an image decodes drops it. Proven: it fails without the ticket check
+- [x] An image with nothing drawn says so, and **Draw a box** picks the rectangle
+
+Commit: `annotator: decode and empty states, shared drawScene signature`

@@ -3,29 +3,30 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { decodeImage, type LoadedImage, type OpenResult } from "@/model/image";
+import type { LoadedImage } from "@/model/image";
 import { loadSample } from "@/model/sample";
 import { AppBar } from "../editor/app-bar";
+import { Kbd } from "../editor/kbd";
 import { Hero } from "./hero";
 import { SampleCredit } from "./sample-credit";
 import { useImageInput } from "./use-image-input";
-
-const kbd =
-  "inline-block min-w-[1.6em] border px-1 text-center font-mono text-[0.85em] leading-normal text-ink-2";
 
 /**
  * Screen 01: open an image by choosing it, dropping it anywhere on the page (screen 02) or pasting
  * it. A file Snapmark can't open is refused by name in the help line (screen 03).
  */
 export const OpenScreen = ({
-  onOpen,
+  refusal,
+  onFile,
+  onSample,
 }: {
-  /** `sample` is true for the sample photo, which opens with the design file's sample layers. */
-  onOpen: (image: LoadedImage, sample: boolean) => void;
+  /** Why the last file couldn't be opened, or null. */
+  refusal: string | null;
+  onFile: (file: File) => void;
+  onSample: () => void;
 }) => {
   const pickerRef = useRef<HTMLInputElement>(null);
   const chooseRef = useRef<HTMLButtonElement>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
   const [hero, setHero] = useState<LoadedImage | null>(null);
 
   // The figure's own copy of the sample; the editor decodes its own, so each closes what it made.
@@ -44,21 +45,12 @@ export const OpenScreen = ({
     };
   }, []);
 
-  const settle = (result: OpenResult, sample: boolean) => {
-    if (result.ok) {
-      onOpen(result.image, sample);
-      return;
-    }
-    setRefusal(result.reason);
-    chooseRef.current?.focus();
-  };
+  // A refusal moves focus back to the way out of it.
+  useEffect(() => {
+    if (refusal) chooseRef.current?.focus();
+  }, [refusal]);
 
-  const open = async (file: File) =>
-    settle(await decodeImage(file, file.name || "Pasted image"), false);
-
-  const openSample = async () => settle(await loadSample(), true);
-
-  const dragging = useImageInput(open);
+  const dragging = useImageInput(onFile);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -80,7 +72,7 @@ export const OpenScreen = ({
               >
                 Choose an image
               </Button>
-              <Button variant="outline" size="control-lg" onClick={openSample}>
+              <Button variant="outline" size="control-lg" onClick={onSample}>
                 Open the sample
               </Button>
             </div>
@@ -95,7 +87,7 @@ export const OpenScreen = ({
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
-                if (file) open(file);
+                if (file) onFile(file);
               }}
             />
             <p
@@ -109,13 +101,12 @@ export const OpenScreen = ({
               {refusal ?? (
                 <>
                   PNG, JPEG or WebP, kept on this device and never uploaded.
-                  Paste with <kbd className={kbd}>⌘&nbsp;V</kbd>, or drop a file
-                  anywhere here.
+                  Paste with <Kbd>⌘&nbsp;V</Kbd>, or drop a file anywhere here.
                 </>
               )}
             </p>
           </div>
-          <Hero image={hero} onOpenSample={openSample} />
+          <Hero image={hero} onOpenSample={onSample} />
         </div>
       </main>
       <footer className="px-16 py-6 max-[60rem]:px-6 max-[40rem]:px-4">
