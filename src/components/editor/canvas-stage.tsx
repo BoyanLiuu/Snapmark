@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { fit } from "@/geom/camera";
 import { hitTest } from "@/geom/hit";
 import { toImage } from "@/geom/matrix";
+import { CURSOR, handleAt } from "@/geom/resize";
 import {
   IDLE,
   move,
@@ -99,6 +100,10 @@ const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
   </div>
 );
 
+/** Shapes with a box to drag by its handles. Arrows get end handles in M7, text a width in M13. */
+const resizable = (a: Annotation) =>
+  a.kind === "rect" || a.kind === "highlight" || a.kind === "pixelate";
+
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
@@ -108,6 +113,7 @@ export interface StageActions {
   onSelect: (id: Id | null) => void;
   onDraw: (box: Box) => void;
   onMove: (id: Id, dx: number, dy: number) => void;
+  onResize: (id: Id, box: Box) => void;
   onDelete: () => void;
   onDrawBox: () => void;
 }
@@ -185,7 +191,7 @@ export const CanvasStage = ({
         const id = selectedRef.current;
         const a =
           id && shown?.order.includes(id) ? shown.byId.get(id) : undefined;
-        if (a) drawSelection(ctx, frame, outline(a), dimsOf(a));
+        if (a) drawSelection(ctx, frame, outline(a), dimsOf(a), resizable(a));
       },
       // React only hears about frames when the debug readout is showing.
       onFrame: (next) => {
@@ -237,7 +243,11 @@ export const CanvasStage = ({
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     };
-    return { screen, image: toImage(view.camera(), screen) };
+    return {
+      screen,
+      image: toImage(view.camera(), screen),
+      shift: event.shiftKey,
+    };
   };
 
   const apply = (effects: Effect[]) => {
@@ -245,6 +255,7 @@ export const CanvasStage = ({
     for (const effect of effects) {
       if (effect.kind === "select") act.onSelect(effect.id);
       else if (effect.kind === "draw") act.onDraw(effect.box);
+      else if (effect.kind === "resize") act.onResize(effect.id, effect.box);
       else act.onMove(effect.id, effect.dx, effect.dy);
     }
   };
@@ -257,27 +268,42 @@ export const CanvasStage = ({
     if (changed) viewRef.current?.invalidate("base");
   };
 
-  const cursorFor = (at: PointerAt) => {
-    const gesture = gestureRef.current;
-    if (gesture.kind === "moving") return "grabbing";
-    if (gesture.kind === "drawing" || toolRef.current === "rect")
-      return "crosshair";
+  /** The selected shape's handle under the pointer, if it has handles. */
+  const grabbed = (at: PointerAt) => {
+    const id = selectedRef.current;
+    const a = id ? docRef.current?.byId.get(id) : undefined;
+    const view = viewRef.current;
+    if (!a || !view || !resizable(a)) return undefined;
+    const box = outline(a);
+    const handle = handleAt(box, at.image, view.camera().scale);
+    return handle ? { id: a.id, handle, box } : undefined;
+  };
+
+  const hitAt = (at: PointerAt) => {
     const shown = docRef.current;
     const view = viewRef.current;
-    return shown && view && hitTest(shown, at.image, view.camera().scale)
-      ? "move"
-      : "default";
+    return shown && view ? hitTest(shown, at.image, view.camera().scale) : null;
+  };
+
+  const cursorFor = (at: PointerAt) => {
+    const gesture = gestureRef.current;
+    if (gesture.kind === "resizing") return CURSOR[gesture.handle];
+    if (gesture.kind === "moving") return "grabbing";
+    if (gesture.kind === "drawing") return "crosshair";
+    const grab = grabbed(at);
+    if (grab) return CURSOR[grab.handle];
+    if (toolRef.current === "rect") return "crosshair";
+    return hitAt(at) ? "move" : "default";
   };
 
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     const at = pointerAt(event);
-    const shown = docRef.current;
-    const view = viewRef.current;
-    if (event.button !== 0 || !at || !shown || !view || !imageRef.current)
+    if (event.button !== 0 || !at || !docRef.current || !imageRef.current)
       return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    const hit = hitTest(shown, at.image, view.camera().scale);
-    const [gesture, effects] = press(toolRef.current, hit, at);
+    const grab = grabbed(at);
+    const hit = grab ? null : hitAt(at);
+    const [gesture, effects] = press(toolRef.current, hit, at, grab);
     gestureRef.current = gesture;
     apply(effects);
   };

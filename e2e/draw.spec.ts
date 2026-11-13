@@ -100,3 +100,23 @@ test("a box moves by dragging its frame, the document changing only on release, 
   await page.keyboard.press("Delete");
   await expect(count(page)).toHaveText("0 annotations");
 });
+
+test("dragging a corner past the opposite one flips the box, in image px", async ({
+  page,
+}) => {
+  const a = await onPage(page, A);
+  const b = await onPage(page, B);
+  await drag(page, a, b);
+  const scale = (a.x - b.x) / (A.x - B.x);
+  // The box runs from B's x and A's y (top-left) to A's x and B's y (bottom-right).
+  await drag(page, { x: b.x, y: a.y }, { x: a.x + 100, y: b.y + 60 });
+  const near = async (name: "x" | "y" | "w" | "h", value: number) =>
+    expect(
+      Math.abs((await field(page, name)) - value),
+      name,
+    ).toBeLessThanOrEqual(8);
+  await near("x", A.x);
+  await near("y", B.y);
+  await near("w", 100 / scale);
+  await near("h", 60 / scale);
+});

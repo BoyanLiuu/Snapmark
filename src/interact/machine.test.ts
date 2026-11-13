@@ -40,4 +40,18 @@ describe("the interaction machine", () => {
   it("an annotation under the pointer wins over drawing a new box", () => {
     expect(press("rect", "a", at(400, 400))[0].kind).toBe("pressing");
   });
+
+  it("dragging a handle resizes once, on release; a click on a handle changes nothing", () => {
+    const grab = {
+      id: "a",
+      handle: "se" as const,
+      box: { x: 400, y: 400, w: 400, h: 200 },
+    };
+    const [down, effects] = press("select", "a", at(800, 600), grab);
+    expect(effects).toEqual([]);
+    expect(release(down, at(804, 600))).toEqual([]);
+    expect(release(move(down, at(1000, 700)), at(1000, 700))).toEqual([
+      { kind: "resize", id: "a", box: { x: 400, y: 400, w: 600, h: 300 } },
+    ]);
+  });
 });

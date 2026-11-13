@@ -114,6 +114,9 @@ export const EditorShell = ({
       const a = doc?.byId.get(id);
       if (doc && a) change(updateAnnotation(doc, id, translated(a, dx, dy)));
     },
+    onResize: (id, box) => {
+      if (doc) change(updateAnnotation(doc, id, box));
+    },
     onDelete: () => {
       if (!doc || !selectedId) return;
       change(removeAnnotations(doc, new Set([selectedId])));

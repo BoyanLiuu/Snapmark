@@ -6,8 +6,8 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M5 of M0–M19 done: open an image, draw rectangles on it, select, move and delete them,
-all in image px through a tested coordinate chain. Resize handles are next.
+**Status:** M0–M5 of M0–M19 done: open an image, draw rectangles on it, select, move, resize and delete
+them, all in image px through a tested coordinate chain. Arrows are next.
 See [MILESTONES.md](MILESTONES.md).
 
 ## Stack
@@ -50,7 +50,7 @@ src/
   model/palette.ts      the six colours
   model/image.ts        format from bytes, decode upright
   model/sample.ts       the sample photo (public/samples/) and its annotations
-  geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts, hit.ts
+  geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts, hit.ts, resize.ts
   interact/machine.ts   the interaction state machine: press, move, release, preview
   render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
                         scene.ts (drawScene, shared with the export from M8), draw/ (per kind)

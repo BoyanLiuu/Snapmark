@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M5 — `pnpm check` green (format, typecheck, lint, 30 unit tests,
-build); `pnpm test:e2e` 38 passed (19 checks, each at 2x and 1x).
+**Last verified:** 2026-11-13, M6 — `pnpm check` green (format, typecheck, lint, 37 unit tests,
+build); `pnpm test:e2e` 40 passed (20 checks, each at 2x and 1x).
 
 ---
 
@@ -247,3 +247,15 @@ Check (`src/interact/machine.test.ts`, `src/geom/hit.test.ts`, `e2e/draw.spec.ts
 - [x] `Esc` drops a box being drawn
 
 Commit: `rect: annotation model, hit testing and the interaction state machine`
+
+## M6 — Resize handles ✅
+
+- [x] `geom/resize.ts`: anchor per handle, flip past the opposite edge with the held handle
+      mirrored, shift keeps the aspect on corners
+- [x] Handles drawn and hit at 8 screen px at any zoom, on rectangles, highlights and pixelate
+      regions; the cursor shows the held handle's direction
+- [x] Check: the table (corner, edge, one-axis flip, two-axis flip, shift, shift through a flip),
+      handles at 10% and 400%, a handle click changes nothing, and in the browser a corner dragged
+      past the opposite one flips the box, in image px
+
+Commit: `resize: eight handles with flip and shift-aspect`
