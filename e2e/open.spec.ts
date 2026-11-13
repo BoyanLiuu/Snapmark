@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+import { SWATCHES } from "../src/model/palette";
 import { findPainted } from "./helpers";
 
 /** M3: every way an image gets in, and the one way it is refused. Files: scripts/make-fixtures.mjs. */
@@ -105,4 +106,28 @@ test("the sample opens from this app, credited", async ({ page }) => {
   await opened(page, "Lago-di-Braies.webp");
   await expect(page.getByText(/^4554\s×\s3036\spx$/)).toBeVisible();
   await expect(page.getByRole("link", { name: "CC0" })).toBeVisible();
+});
+
+test("the sample's annotations are drawn, and hiding one takes it off the canvas", async ({
+  page,
+}) => {
+  await page
+    .getByRole("button", { name: "Open the sample", exact: true })
+    .click();
+  await opened(page, "Lago-di-Braies.webp");
+  // The orange swatch as the canvas paints it; only the boathouse box uses it.
+  const orange = await page.evaluate(
+    (css) => {
+      const ctx = new OffscreenCanvas(1, 1).getContext("2d")!;
+      ctx.fillStyle = css;
+      ctx.fillRect(0, 0, 1, 1);
+      return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+    },
+    SWATCHES.find((s) => s.id === "orange")!.css,
+  );
+  const painted = async () => (await findPainted(page, orange))?.count ?? 0;
+  await expect.poll(painted).toBeGreaterThan(50);
+  const shown = await painted();
+  await page.getByRole("button", { name: "Hide Orange rectangle" }).click();
+  await expect.poll(painted).toBeLessThan(shown * 0.1);
 });

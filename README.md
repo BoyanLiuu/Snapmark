@@ -44,12 +44,14 @@ src/
   components/open/      the open screen: pick, drop, paste, and the hero lenses
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
                         (sample.ts holds the design file's sample layers until M15)
-  model/types.ts        ALL geometry is image space
+  model/types.ts        ALL geometry is image space: the annotation types
+  model/doc.ts          the document: annotations by id, in paint order
+  model/palette.ts      the six colours
   model/image.ts        format from bytes, decode upright
-  model/sample.ts       the sample photo (public/samples/)
-  geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit)
+  model/sample.ts       the sample photo (public/samples/) and its annotations
+  geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts
   render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
-                        test-chart.ts
+                        scene.ts (drawScene, shared with the export from M8), draw/ (per kind)
 scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart)
 tests/                  repo-wide architecture checks
 e2e/                    Playwright

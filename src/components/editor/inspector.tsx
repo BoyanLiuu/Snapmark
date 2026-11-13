@@ -3,47 +3,21 @@
 import { useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { SWATCHES, type SwatchId } from "@/model/palette";
 
-const SWATCHES = [
-  {
-    id: "red",
-    label: "Red",
-    className:
-      "bg-swatch-red hover:bg-swatch-red data-[state=on]:bg-swatch-red",
-  },
-  {
-    id: "orange",
-    label: "Orange",
-    className:
-      "bg-swatch-orange hover:bg-swatch-orange data-[state=on]:bg-swatch-orange",
-  },
-  {
-    id: "yellow",
-    label: "Yellow",
-    className:
-      "bg-swatch-yellow hover:bg-swatch-yellow data-[state=on]:bg-swatch-yellow",
-  },
-  {
-    id: "green",
-    label: "Green",
-    className:
-      "bg-swatch-green hover:bg-swatch-green data-[state=on]:bg-swatch-green",
-  },
-  {
-    id: "sky",
-    label: "Sky",
-    className:
-      "bg-swatch-sky hover:bg-swatch-sky data-[state=on]:bg-swatch-sky",
-  },
-  {
-    id: "white",
-    label: "White",
-    className:
-      "bg-swatch-white hover:bg-swatch-white data-[state=on]:bg-swatch-white",
-  },
-] as const;
-
-type SwatchId = (typeof SWATCHES)[number]["id"];
+// Tailwind needs whole class names, so each swatch's classes are spelled out here.
+const SWATCH_CLASS: Record<SwatchId, string> = {
+  red: "bg-swatch-red hover:bg-swatch-red data-[state=on]:bg-swatch-red",
+  orange:
+    "bg-swatch-orange hover:bg-swatch-orange data-[state=on]:bg-swatch-orange",
+  yellow:
+    "bg-swatch-yellow hover:bg-swatch-yellow data-[state=on]:bg-swatch-yellow",
+  green:
+    "bg-swatch-green hover:bg-swatch-green data-[state=on]:bg-swatch-green",
+  sky: "bg-swatch-sky hover:bg-swatch-sky data-[state=on]:bg-swatch-sky",
+  white:
+    "bg-swatch-white hover:bg-swatch-white data-[state=on]:bg-swatch-white",
+};
 
 /** ARCHITECTURE.md §3: a stroke that reads the same on any image, in image px. */
 export const defaultStroke = (naturalWidth: number) =>
@@ -139,12 +113,12 @@ export const Inspector = ({ naturalWidth }: { naturalWidth: number }) => {
           onValueChange={(value) => value && setColour(value as SwatchId)}
           className="flex-wrap"
         >
-          {SWATCHES.map(({ id, label, className }) => (
+          {SWATCHES.map(({ id, label }) => (
             <ToggleGroupItem
               key={id}
               value={id}
               aria-label={label}
-              className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${className}`}
+              className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
             />
           ))}
         </ToggleGroup>

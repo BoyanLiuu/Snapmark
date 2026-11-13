@@ -11,6 +11,7 @@ import { fit } from "@/geom/camera";
 import { toImage } from "@/geom/matrix";
 import { createStore, type Store } from "@/lib/store";
 import type { LoadedImage } from "@/model/image";
+import type { Doc } from "@/model/types";
 import type { Point } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
 import { drawOverlay } from "@/render/overlay";
@@ -44,9 +45,12 @@ const CursorReadout = ({ store }: { store: Store<string> }) => {
 export const CanvasStage = ({
   status,
   image,
+  doc,
   onZoomChange,
 }: {
   status: string;
+  /** What is drawn on the image, in image px. */
+  doc: Doc;
   /** Null until the image has decoded. */
   image: Pick<LoadedImage, "bitmap" | "natural"> | null;
   /** Called when the fitted scale changes (screen px per image px). */
@@ -59,6 +63,7 @@ export const CanvasStage = ({
   // Read by the draws; kept out of React state so a frame re-renders nothing.
   const pointerRef = useRef<Point | null>(null);
   const imageRef = useRef(image);
+  const docRef = useRef(doc);
   const onZoomRef = useRef(onZoomChange);
   const [cursor] = useState(() => createStore(POINTER_OFF));
   const [stats, setStats] = useState<ViewStats | null>(null);
@@ -82,7 +87,7 @@ export const CanvasStage = ({
           : { scale: 1, tx: 0, ty: 0 },
       drawBase: (ctx, frame) => {
         const current = imageRef.current;
-        if (current) drawImageLayer(ctx, frame, current.bitmap);
+        if (current) drawImageLayer(ctx, frame, docRef.current, current.bitmap);
       },
       drawOverlay: (ctx, frame) => drawOverlay(ctx, frame, pointerRef.current),
       // Frames happen on every pointer move, so React only hears about them when the debug
@@ -109,6 +114,11 @@ export const CanvasStage = ({
     imageRef.current = image;
     viewRef.current?.invalidate();
   }, [image]);
+
+  useEffect(() => {
+    docRef.current = doc;
+    viewRef.current?.invalidate("base");
+  }, [doc]);
 
   useEffect(() => {
     onZoomRef.current = onZoomChange;

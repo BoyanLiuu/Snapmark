@@ -34,7 +34,7 @@ decisions log.
 |                          | M19 — The phone                              |         |
 
 **Last verified:** 2026-11-13, M3 — `pnpm check` green (format, typecheck, lint, 22 unit tests,
-build); `pnpm test:e2e` 30 passed (5 canvas, 4 shell and 6 open checks, each at 2x and 1x).
+build); `pnpm test:e2e` 32 passed (5 canvas, 4 shell and 7 open checks, each at 2x and 1x).
 
 ---
 
@@ -184,5 +184,17 @@ Worth a look by eye:
 
 - [ ] Copy a screenshot (⇧⌘⌃4 on a Mac), open the page, press ⌘V
 - [ ] Drag a photo from Finder onto the page
+
+Added after review, at the user's request — the sample opens with annotations drawn:
+
+- [x] Annotation types, the document and the six-colour palette — `model/types.ts`, `doc.ts`,
+      `palette.ts`
+- [x] `drawScene` with its final signature and four passes; rect, arrow, highlight (multiply), text
+      on a plate, live pixelate — `render/scene.ts`, `render/draw/` (render only; drawing them by
+      hand is still M5–M14)
+- [x] The sample's seven annotations on the photo, also on the open screen's figure; the layer
+      list reads them from the document, and the eye button hides one from the canvas
+- [x] Check: the sample's annotations are drawn, and hiding one takes it off the canvas (proven by
+      passing the unfiltered document, which fails at 2x and 1x)
 
 Commit: `open: dropzone with pick, drop, paste and codec rejection`

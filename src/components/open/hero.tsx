@@ -6,7 +6,8 @@ import type { Camera } from "@/geom/matrix";
 import { cn } from "@/lib/utils";
 import { drawImageLayer } from "@/render/image";
 import { drawMark } from "@/render/overlay";
-import { SAMPLE } from "@/model/sample";
+import { SAMPLE, SAMPLE_DOC } from "@/model/sample";
+import type { RectA } from "@/model/types";
 import type { Size } from "@/model/types";
 import { createView, type View, type ViewSize } from "@/render/view";
 
@@ -47,7 +48,8 @@ const Lens = ({
       overlay,
       camera,
       drawBase: (ctx, frame) => {
-        if (bitmapRef.current) drawImageLayer(ctx, frame, bitmapRef.current);
+        if (bitmapRef.current)
+          drawImageLayer(ctx, frame, SAMPLE_DOC, bitmapRef.current);
       },
       drawOverlay: (ctx, frame) => drawMark(ctx, frame, PIXEL),
       onFrame: ({ camera: { scale: next } }) => {
@@ -97,6 +99,11 @@ const Strip = ({ items }: { items: [string, string][] }) => (
 );
 
 const at = `${PIXEL.x}, ${PIXEL.y}`;
+// The box whose corner is the signature pixel.
+const box = [...SAMPLE_DOC.byId.values()].find(
+  (a): a is RectA => a.kind === "rect" && a.x === PIXEL.x && a.y === PIXEL.y,
+);
+const boxSize = box ? `${box.w} × ${box.h}` : "";
 // Stable per size, so the lenses aren't rebuilt on every render.
 const lensCameras = (nat: Size) => ({
   whole: (view: ViewSize) => fit(nat, { w: view.cssW, h: view.cssH }, 1),
@@ -144,7 +151,8 @@ export const Hero = ({
                 "View",
                 `${fitted === null ? "–" : Math.round(fitted * 100)}% · ${size}`,
               ],
-              ["Pixel", at],
+              ["Box", boxSize],
+              ["Top-left", at],
             ]}
           />
         </Lens>
@@ -154,7 +162,7 @@ export const Hero = ({
           <Strip
             items={[
               ["Zoomed", "400%"],
-              ["Pixel", at],
+              ["Top-left", at],
             ]}
           />
         </Lens>
@@ -162,7 +170,7 @@ export const Hero = ({
           <Strip
             items={[
               ["The PNG", size],
-              ["Pixel", at],
+              ["Top-left", at],
             ]}
           />
         </Lens>

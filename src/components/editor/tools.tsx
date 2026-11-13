@@ -7,7 +7,7 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import type { LayerKind } from "./sample";
+import type { Annotation } from "@/model/types";
 
 export type ToolId =
   "select" | "rect" | "arrow" | "highlight" | "text" | "pixelate";
@@ -56,7 +56,7 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-export const KIND_ICON: Record<LayerKind, LucideIcon> = {
+export const KIND_ICON: Record<Annotation["kind"], LucideIcon> = {
   arrow: ArrowUpRight,
   text: Type,
   rect: Square,

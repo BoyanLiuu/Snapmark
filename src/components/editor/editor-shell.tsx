@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createDoc, withoutIds } from "@/model/doc";
+import { SAMPLE_DOC, SAMPLE_EDITED } from "@/model/sample";
+import type { Id } from "@/model/types";
 import type { LoadedImage } from "@/model/image";
 import { SampleCredit } from "../open/sample-credit";
 import { AppBar } from "./app-bar";
@@ -8,7 +11,7 @@ import { CanvasStage } from "./canvas-stage";
 import { EditorBar } from "./editor-bar";
 import { Inspector } from "./inspector";
 import { LayerList } from "./layer-list";
-import { SAMPLE_LAYERS, SAMPLE_STATUS } from "./sample";
+import { layerRows } from "./layers";
 import type { ToolId } from "./tools";
 
 /**
@@ -27,18 +30,25 @@ export const EditorShell = ({
 }) => {
   const [tool, setTool] = useState<ToolId>("select");
   const [zoom, setZoom] = useState<number | null>(null);
+  const [doc] = useState(() =>
+    sample ? SAMPLE_DOC : createDoc(image.natural),
+  );
+  const [hidden, setHidden] = useState<ReadonlySet<Id>>(new Set());
+  const shown = useMemo(() => withoutIds(doc, hidden), [doc, hidden]);
+  const count = doc.order.length;
+  const status = count
+    ? `${count} annotation${count === 1 ? "" : "s"}, last edited ${SAMPLE_EDITED}.`
+    : "Nothing drawn on this image yet.";
+
+  const toggleHidden = (id: Id) =>
+    setHidden((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   return (
     <div className="flex h-dvh min-h-[560px] flex-col">
-      {sample && (
-        <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-b bg-card px-4 py-2 text-sm text-muted-foreground">
-          <p>
-            This is the sample, with the design file’s sample layers. No tool
-            draws yet.
-          </p>
-          <SampleCredit />
-        </div>
-      )}
       <AppBar variant="app" onHome={onClose} />
       <main
         aria-labelledby="editor-file"
@@ -54,7 +64,8 @@ export const EditorShell = ({
         />
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px]">
           <CanvasStage
-            status={sample ? SAMPLE_STATUS : "Nothing drawn on this image yet."}
+            status={status}
+            doc={shown}
             image={image}
             onZoomChange={setZoom}
           />
@@ -63,7 +74,11 @@ export const EditorShell = ({
             className="flex min-h-0 flex-col overflow-y-auto border-l bg-card"
           >
             <Inspector naturalWidth={image.natural.w} />
-            <LayerList layers={sample ? SAMPLE_LAYERS : []} />
+            <LayerList
+              layers={layerRows(doc)}
+              hidden={hidden}
+              onToggleHidden={toggleHidden}
+            />
             <p className="mt-auto px-6 py-4 text-sm text-muted-foreground">
               Drag a row, or press{" "}
               <kbd className="inline-block min-w-[1.6em] border px-1 text-center font-mono text-[0.85em] leading-normal text-ink-2">
@@ -74,6 +89,15 @@ export const EditorShell = ({
           </aside>
         </div>
       </main>
+      {sample && (
+        <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-t bg-card px-4 py-2 text-sm text-muted-foreground">
+          <p>
+            This is the sample, with the design file’s sample layers. No tool
+            draws yet.
+          </p>
+          <SampleCredit />
+        </div>
+      )}
     </div>
   );
 };

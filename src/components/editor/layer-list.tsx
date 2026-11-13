@@ -4,25 +4,26 @@ import { Eye, EyeOff, GripVertical } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { SampleLayer } from "./sample";
+import type { Id } from "@/model/types";
+import type { LayerRow } from "./layers";
 import { KIND_ICON } from "./tools";
 
 const plural = (n: number) => `${n} annotation${n === 1 ? "" : "s"}`;
 
 /**
  * The layers rail: one row per annotation, top of the paint order first, with its size in image
- * px. Selection and visibility are UI state only until M15 makes the rows the document's.
+ * px. The eye button hides a layer from the canvas; selection is UI state until M5.
  */
-export const LayerList = ({ layers }: { layers: SampleLayer[] }) => {
-  const [selected, setSelected] = useState<string | null>(null);
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-
-  const toggleHidden = (id: string) =>
-    setHidden((current) => {
-      const next = new Set(current);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+export const LayerList = ({
+  layers,
+  hidden,
+  onToggleHidden,
+}: {
+  layers: LayerRow[];
+  hidden: ReadonlySet<Id>;
+  onToggleHidden: (id: Id) => void;
+}) => {
+  const [selected, setSelected] = useState<Id | null>(null);
 
   return (
     <section aria-labelledby="layers-title" className="grid gap-4 border-b p-6">
@@ -92,7 +93,7 @@ export const LayerList = ({ layers }: { layers: SampleLayer[] }) => {
                 className="size-8 [&_svg:not([class*='size-'])]:size-4"
                 aria-pressed={!isHidden}
                 aria-label={`${isHidden ? "Show" : "Hide"} ${name}`}
-                onClick={() => toggleHidden(id)}
+                onClick={() => onToggleHidden(id)}
               >
                 {isHidden ? <EyeOff /> : <Eye />}
               </Button>
