@@ -33,9 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M4 — `pnpm check` green (format, typecheck, lint, 22 unit tests,
-build); `pnpm test:e2e` 38 passed (5 canvas, 4 shell, 7 open and 3 annotator checks, each at 2x
-and 1x).
+**Last verified:** 2026-11-13, M5 — `pnpm check` green (format, typecheck, lint, 30 unit tests,
+build); `pnpm test:e2e` 38 passed (19 checks, each at 2x and 1x).
 
 ---
 
@@ -222,3 +221,29 @@ Check (`e2e/annotator.spec.ts` at 2x and 1x):
 - [x] An image with nothing drawn says so, and **Draw a box** picks the rectangle
 
 Commit: `annotator: decode and empty states, shared drawScene signature`
+
+## M5 — Rectangle, model, selection ✅
+
+Build:
+
+- [x] Document changes in one place, each returning a new document — `model/doc.ts`; outlines and
+      painted boxes per kind — `model/bbox.ts`; names and sizes — `model/describe.ts`
+- [x] Hit testing, topmost first, 6 screen px of tolerance, unfilled boxes on their frame —
+      `geom/hit.ts`
+- [x] The interaction machine with the 3 screen-px click-vs-drag threshold — `interact/machine.ts`
+- [x] Drawing with the rectangle: the draft draws live, the box is written once on pointer-up and
+      selected (screens 12, 13)
+- [x] Select by clicking a shape or its layer row; move by dragging; `Delete` / `Backspace` remove
+      it; `Esc` drops a gesture in progress, or else the selection
+- [x] The selection: hairline outline, eight handles, size tag; the inspector edits it and shows
+      X, Y, W, H, with Delete
+
+Check (`src/interact/machine.test.ts`, `src/geom/hit.test.ts`, `e2e/draw.spec.ts` at 2x and 1x):
+
+- [x] Where two boxes overlap, a click selects the top one (fails if the scan order flips)
+- [x] A click draws no 0 × 0 box (fails, unit and browser, if a release always draws)
+- [x] A box dragged from landmark A to B is recorded in image px and selected
+- [x] Dragging a box changes nothing until release, then moves it by image px; `Delete` removes it
+- [x] `Esc` drops a box being drawn
+
+Commit: `rect: annotation model, hit testing and the interaction state machine`

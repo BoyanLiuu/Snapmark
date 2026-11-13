@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { outline } from "@/model/bbox";
+import { KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
+import type { Annotation } from "@/model/types";
 
 // Tailwind needs whole class names, so each swatch's classes are spelled out here.
 const SWATCH_CLASS: Record<SwatchId, string> = {
@@ -79,15 +83,36 @@ const RangeField = ({
   </div>
 );
 
+/** The look a new annotation is drawn with, and what the inspector edits on a selected one. */
+export interface Style {
+  color: SwatchId;
+  /** Image px. */
+  strokeWidth: number;
+  /** 0..1 */
+  opacity: number;
+}
+
 /**
- * The inspector for new annotations: a fixed six-colour palette with no picker, then stroke and
- * opacity. UI state only until M7 wires it to the model.
+ * The inspector. With nothing selected it sets the look of the next annotation ("New annotations",
+ * screen 09); with one selected it edits that one and shows where it is (screen 13). A fixed
+ * six-colour palette and no picker.
  */
-export const Inspector = ({ naturalWidth }: { naturalWidth: number }) => {
-  const initialStroke = defaultStroke(naturalWidth);
-  const [colour, setColour] = useState<SwatchId>("red");
-  const [stroke, setStroke] = useState(initialStroke);
-  const [opacity, setOpacity] = useState(100);
+export const Inspector = ({
+  subject,
+  style,
+  onChange,
+  onDelete,
+}: {
+  subject: { naturalWidth: number } | { selected: Annotation };
+  style: Style;
+  onChange: (patch: Partial<Style>) => void;
+  onDelete: () => void;
+}) => {
+  const selected = "selected" in subject ? subject.selected : null;
+  const kind = selected?.kind;
+  const hasColour = kind !== "pixelate";
+  const hasStroke = !kind || kind === "rect" || kind === "arrow";
+  const box = selected ? outline(selected) : null;
 
   return (
     <section
@@ -98,51 +123,115 @@ export const Inspector = ({ naturalWidth }: { naturalWidth: number }) => {
         id="inspector-title"
         className="text-[1.2rem] leading-[1.05] font-medium tracking-[-0.04em]"
       >
-        New annotations
+        {kind ? KIND_LABEL[kind] : "New annotations"}
       </h2>
 
-      <div className="grid gap-2">
-        <span id="colour-label" className={labelClass}>
-          Colour
-        </span>
-        <ToggleGroup
-          type="single"
-          aria-labelledby="colour-label"
-          spacing={2}
-          value={colour}
-          onValueChange={(value) => value && setColour(value as SwatchId)}
-          className="flex-wrap"
-        >
-          {SWATCHES.map(({ id, label }) => (
-            <ToggleGroupItem
-              key={id}
-              value={id}
-              aria-label={label}
-              className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
-            />
-          ))}
-        </ToggleGroup>
-      </div>
+      {hasColour && (
+        <div className="grid gap-2">
+          <span id="colour-label" className={labelClass}>
+            Colour
+          </span>
+          <ToggleGroup
+            type="single"
+            aria-labelledby="colour-label"
+            spacing={2}
+            value={style.color}
+            onValueChange={(value) =>
+              value && onChange({ color: value as SwatchId })
+            }
+            className="flex-wrap"
+          >
+            {SWATCHES.map(({ id, label }) => (
+              <ToggleGroupItem
+                key={id}
+                value={id}
+                aria-label={label}
+                className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
+              />
+            ))}
+          </ToggleGroup>
+        </div>
+      )}
 
-      <RangeField
-        id="stroke"
-        label="Stroke"
-        value={stroke}
-        min={1}
-        max={60}
-        unit={"\u00a0px"}
-        help={`Image pixels, so it exports at this width at any zoom. ${strokeReason(naturalWidth, initialStroke)}`}
-        onChange={setStroke}
-      />
+      {hasStroke && (
+        <RangeField
+          id="stroke"
+          label="Stroke"
+          value={Math.round(style.strokeWidth)}
+          min={1}
+          max={60}
+          unit={"\u00a0px"}
+          help={
+            "naturalWidth" in subject
+              ? `Image pixels, so it exports at this width at any zoom. ${strokeReason(subject.naturalWidth, defaultStroke(subject.naturalWidth))}`
+              : undefined
+          }
+          onChange={(strokeWidth) => onChange({ strokeWidth })}
+        />
+      )}
       <RangeField
         id="opacity"
         label="Opacity"
-        value={opacity}
+        value={Math.round(style.opacity * 100)}
         min={10}
         max={100}
         unit="%"
-        onChange={setOpacity}
+        onChange={(percent) => onChange({ opacity: percent / 100 })}
       />
+
+      {box && (
+        <>
+          <dl className="grid grid-cols-4 border-t border-rule-2 pt-3">
+            {(
+              [
+                ["X", box.x],
+                ["Y", box.y],
+                ["W", box.w],
+                ["H", box.h],
+              ] as const
+            ).map(([label, value]) => (
+              <div
+                key={label}
+                className="grid gap-1 border-r border-rule-2 px-2 first:pl-0 last:border-r-0"
+              >
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd
+                  data-testid={`box-${label.toLowerCase()}`}
+                  className="font-mono text-sm text-foreground tabular-nums"
+                >
+                  {Math.round(value)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="control"
+              disabled
+              title="Z-order arrives in M15"
+            >
+              <ChevronUp />
+              Forward
+            </Button>
+            <Button
+              variant="outline"
+              size="control"
+              disabled
+              title="Z-order arrives in M15"
+            >
+              <ChevronDown />
+              Backward
+            </Button>
+          </div>
+          <div>
+            <Button variant="outline" size="control" onClick={onDelete}>
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
+        </>
+      )}
     </section>
   );
 };

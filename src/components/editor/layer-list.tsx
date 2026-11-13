@@ -1,7 +1,6 @@
 "use client";
 
 import { Eye, EyeOff, GripVertical } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Id } from "@/model/types";
@@ -27,20 +26,22 @@ const plural = (n: number) => `${n} annotation${n === 1 ? "" : "s"}`;
 
 /**
  * The layers rail: one row per annotation, top of the paint order first, with its size in image
- * px. The eye button hides a layer from the canvas; selection is UI state until M5.
+ * px. A row selects its annotation, as a click on the canvas does; the eye hides it from the canvas.
  */
 export const LayerList = ({
   layers,
   hidden,
+  selected,
+  onSelect,
   onToggleHidden,
 }: {
   /** Null while the image decodes. */
   layers: LayerRow[] | null;
   hidden: ReadonlySet<Id>;
+  selected: Id | null;
+  onSelect: (id: Id | null) => void;
   onToggleHidden: (id: Id) => void;
 }) => {
-  const [selected, setSelected] = useState<Id | null>(null);
-
   return (
     <section aria-labelledby="layers-title" className="grid gap-4 border-b p-6">
       <div className="flex items-baseline justify-between gap-4">
@@ -88,7 +89,7 @@ export const LayerList = ({
               <button
                 type="button"
                 aria-pressed={isSelected}
-                onClick={() => setSelected(isSelected ? null : id)}
+                onClick={() => onSelect(isSelected ? null : id)}
                 className={cn(
                   "grid min-h-10 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 px-2 text-left text-sm whitespace-nowrap text-ink-2 outline-none hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                   isSelected && "text-foreground",

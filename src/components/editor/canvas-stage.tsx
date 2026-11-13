@@ -9,20 +9,34 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { fit } from "@/geom/camera";
+import { hitTest } from "@/geom/hit";
 import { toImage } from "@/geom/matrix";
+import {
+  IDLE,
+  move,
+  press,
+  preview,
+  release,
+  type Effect,
+  type Gesture,
+  type PointerAt,
+  type ToolId,
+} from "@/interact/machine";
 import { createStore, type Store } from "@/lib/store";
 import { useRefValue } from "@/lib/use-ref-value";
+import { outline, type Box } from "@/model/bbox";
+import { dimsOf } from "@/model/describe";
 import type { LoadedImage } from "@/model/image";
-import type { Doc } from "@/model/types";
-import type { Point, Size } from "@/model/types";
+import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
-import { drawOverlay } from "@/render/overlay";
+import { drawOverlay, drawSelection } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
+import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
 
 const POINTER_OFF = "Pointer off";
 
-/** The image pixel under the pointer, which is the pixel whose square contains it. */
+/** Floor, not round: the pixel whose square contains the pointer. */
 const cursorText = ({ x, y }: Point) =>
   `x\u00a0${Math.floor(x)} y\u00a0${Math.floor(y)}`;
 
@@ -39,10 +53,7 @@ const CursorReadout = ({ store }: { store: Store<string> }) => {
   );
 };
 
-const kbd =
-  "inline-block min-w-[1.6em] border px-1 text-center font-mono text-[0.85em] leading-normal text-ink-2";
-
-/** Screen 08: the image's frame, dashed, until its pixels arrive. Never an empty stage. */
+/** Screen 08: the image's frame until its pixels arrive. */
 const DecodingPlate = ({
   name,
   natural,
@@ -66,10 +77,7 @@ const DecodingPlate = ({
   </div>
 );
 
-/**
- * Screen 10: nothing drawn yet, and the first step. The pointer passes through everywhere but the
- * button, so the cursor readout still works under it.
- */
+/** Screen 10. The pointer passes through all but the button, so drawing works under it. */
 const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
   <div
     data-testid="nothing-drawn"
@@ -79,8 +87,7 @@ const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
       Nothing drawn on this image yet
     </h2>
     <p className="text-sm text-ink-2">
-      Drag across the picture with a tool. Rectangle is{" "}
-      <kbd className={kbd}>R</kbd>.
+      Drag across the picture with a tool. Rectangle is <Kbd>R</Kbd>.
     </p>
     <Button
       size="control"
@@ -92,44 +99,65 @@ const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
   </div>
 );
 
+const typing = (target: EventTarget | null) =>
+  target instanceof HTMLInputElement ||
+  target instanceof HTMLTextAreaElement ||
+  (target instanceof HTMLElement && target.isContentEditable);
+
+export interface StageActions {
+  onSelect: (id: Id | null) => void;
+  onDraw: (box: Box) => void;
+  onMove: (id: Id, dx: number, dy: number) => void;
+  onDelete: () => void;
+  onDrawBox: () => void;
+}
+
 /**
- * The stage: the `base` and `overlay` canvases stacked in a container whose size the layout sets,
- * over the status strip (cursor readout and status line). The image is drawn fitted to the stage,
- * and the pointer is read through the same camera it was drawn with.
+ * The stage: `base` and `overlay` canvases over the status strip. Pointer events go through the
+ * interaction machine; while a gesture runs the base draws its preview, and the document changes
+ * once, on pointer-up.
  */
 export const CanvasStage = ({
   status,
   image,
   doc,
   decoding,
-  onDrawBox,
+  tool,
+  selected,
+  draft,
+  actions,
   onZoomChange,
 }: {
   status: string;
-  /** Null until the image has decoded. */
+  /** Null, with `doc`, until the image has decoded. */
   image: Pick<LoadedImage, "bitmap" | "natural"> | null;
-  /** What is drawn on the image, in image px; null until it has decoded. */
   doc: Doc | null;
-  /** While decoding: the file's name, and its size when known (screen 08). */
   decoding: { name: string; natural: Size | null } | null;
-  /** The empty state's first step (screen 10): choose the rectangle. */
-  onDrawBox: () => void;
-  /** Called when the fitted scale changes (screen px per image px). */
+  tool: ToolId;
+  selected: Id | null;
+  draft: (box: Box) => Annotation;
+  actions: StageActions;
   onZoomChange?: (scale: number) => void;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<View | null>(null);
-  // Read by the draws; kept out of React state so a frame re-renders nothing.
+  // Read during frames and pointer events, so a frame re-renders nothing.
   const pointerRef = useRef<Point | null>(null);
+  const gestureRef = useRef<Gesture>(IDLE);
+  const previewRef = useRef<Doc | null>(null);
   const imageRef = useRefValue(image);
   const docRef = useRefValue(doc);
+  const toolRef = useRefValue(tool);
+  const selectedRef = useRefValue(selected);
+  const draftRef = useRefValue(draft);
+  const actionsRef = useRefValue(actions);
   const onZoomRef = useRefValue(onZoomChange);
   const [cursor] = useState(() => createStore(POINTER_OFF));
   const [stats, setStats] = useState<ViewStats | null>(null);
   const debug = useDebug();
-  const debugRef = useRef(debug);
+  const debugRef = useRefValue(debug);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -137,23 +165,29 @@ export const CanvasStage = ({
     const overlay = overlayRef.current;
     if (!container || !base || !overlay) return;
     let scale: number | null = null;
+    const scene = () => previewRef.current ?? docRef.current;
     const view = createView({
       container,
       base,
       overlay,
-      // Until an image arrives, an identity camera: nothing is drawn through it.
       camera: (size) =>
         imageRef.current
           ? fit(imageRef.current.natural, { w: size.cssW, h: size.cssH })
           : { scale: 1, tx: 0, ty: 0 },
       drawBase: (ctx, frame) => {
         const current = imageRef.current;
-        if (current && docRef.current)
-          drawImageLayer(ctx, frame, docRef.current, current.bitmap);
+        const shown = scene();
+        if (current && shown) drawImageLayer(ctx, frame, shown, current.bitmap);
       },
-      drawOverlay: (ctx, frame) => drawOverlay(ctx, frame, pointerRef.current),
-      // Frames happen on every pointer move, so React only hears about them when the debug
-      // readout is showing. The counters for the browser checks go straight onto the stage.
+      drawOverlay: (ctx, frame) => {
+        drawOverlay(ctx, frame, pointerRef.current);
+        const shown = scene();
+        const id = selectedRef.current;
+        const a =
+          id && shown?.order.includes(id) ? shown.byId.get(id) : undefined;
+        if (a) drawSelection(ctx, frame, outline(a), dimsOf(a));
+      },
+      // React only hears about frames when the debug readout is showing.
       onFrame: (next) => {
         container.dataset.frames = String(next.frames);
         container.dataset.baseDraws = String(next.baseDraws);
@@ -170,42 +204,141 @@ export const CanvasStage = ({
       view.dispose();
       viewRef.current = null;
     };
+    // The view is made once; the refs carry every later value into its frames.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The refs are written after render; invalidating here means the next frame sees the new value.
   useEffect(() => {
     viewRef.current?.invalidate();
   }, [image]);
+
+  // A committed change has arrived: the preview that stood in for it can go.
   useEffect(() => {
-    viewRef.current?.invalidate("base");
+    previewRef.current = null;
+    viewRef.current?.invalidate();
   }, [doc]);
 
   useEffect(() => {
-    debugRef.current = debug;
+    viewRef.current?.invalidate("overlay");
+  }, [selected]);
+
+  useEffect(() => {
     // Draw one frame so the readout has numbers as soon as it appears.
     if (debug) viewRef.current?.invalidate("overlay");
   }, [debug]);
 
-  const trackPointer = (event: PointerEvent<HTMLCanvasElement>) => {
+  const pointerAt = (
+    event: PointerEvent<HTMLCanvasElement>,
+  ): PointerAt | null => {
+    const view = viewRef.current;
+    if (!view) return null;
     const rect = event.currentTarget.getBoundingClientRect();
     const screen = {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
     };
-    pointerRef.current = screen;
-    const view = viewRef.current;
-    if (!view) return;
-    if (imageRef.current)
-      cursor.set(cursorText(toImage(view.camera(), screen)));
-    view.invalidate("overlay");
+    return { screen, image: toImage(view.camera(), screen) };
   };
 
-  const clearPointer = () => {
+  const apply = (effects: Effect[]) => {
+    const act = actionsRef.current;
+    for (const effect of effects) {
+      if (effect.kind === "select") act.onSelect(effect.id);
+      else if (effect.kind === "draw") act.onDraw(effect.box);
+      else act.onMove(effect.id, effect.dx, effect.dy);
+    }
+  };
+
+  const show = (gesture: Gesture) => {
+    const shown = docRef.current;
+    const next = shown ? preview(gesture, shown, draftRef.current) : null;
+    const changed = next !== null || previewRef.current !== null;
+    previewRef.current = next;
+    if (changed) viewRef.current?.invalidate("base");
+  };
+
+  const cursorFor = (at: PointerAt) => {
+    const gesture = gestureRef.current;
+    if (gesture.kind === "moving") return "grabbing";
+    if (gesture.kind === "drawing" || toolRef.current === "rect")
+      return "crosshair";
+    const shown = docRef.current;
+    const view = viewRef.current;
+    return shown && view && hitTest(shown, at.image, view.camera().scale)
+      ? "move"
+      : "default";
+  };
+
+  const down = (event: PointerEvent<HTMLCanvasElement>) => {
+    const at = pointerAt(event);
+    const shown = docRef.current;
+    const view = viewRef.current;
+    if (event.button !== 0 || !at || !shown || !view || !imageRef.current)
+      return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const hit = hitTest(shown, at.image, view.camera().scale);
+    const [gesture, effects] = press(toolRef.current, hit, at);
+    gestureRef.current = gesture;
+    apply(effects);
+  };
+
+  const track = (event: PointerEvent<HTMLCanvasElement>) => {
+    const at = pointerAt(event);
+    if (!at) return;
+    pointerRef.current = at.screen;
+    if (imageRef.current) cursor.set(cursorText(at.image));
+    const gesture = move(gestureRef.current, at);
+    if (gesture !== gestureRef.current) {
+      gestureRef.current = gesture;
+      show(gesture);
+    }
+    event.currentTarget.style.cursor = cursorFor(at);
+    viewRef.current?.invalidate("overlay");
+  };
+
+  const up = (event: PointerEvent<HTMLCanvasElement>) => {
+    const at = pointerAt(event);
+    const gesture = gestureRef.current;
+    gestureRef.current = IDLE;
+    if (!at || gesture.kind === "idle") return;
+    const effects = release(gesture, at);
+    // A change keeps its preview until the new document arrives, so nothing flickers.
+    if (!effects.some((e) => e.kind !== "select")) show(IDLE);
+    apply(effects);
+  };
+
+  const cancel = () => {
+    gestureRef.current = IDLE;
+    show(IDLE);
+    viewRef.current?.invalidate("overlay");
+  };
+
+  const leave = () => {
     pointerRef.current = null;
     cursor.set(POINTER_OFF);
     viewRef.current?.invalidate("overlay");
   };
+
+  // Esc drops a gesture in progress, or else the selection; Delete and Backspace remove it.
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (typing(event.target)) return;
+      if (event.key === "Escape") {
+        if (gestureRef.current.kind !== "idle") cancel();
+        else actionsRef.current.onSelect(null);
+      } else if (
+        (event.key === "Delete" || event.key === "Backspace") &&
+        selectedRef.current &&
+        gestureRef.current.kind === "idle"
+      ) {
+        event.preventDefault();
+        actionsRef.current.onDelete();
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative grid min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden bg-paper-3">
@@ -226,12 +359,15 @@ export const CanvasStage = ({
           data-layer="overlay"
           aria-hidden
           className="absolute top-0 left-0 touch-none"
-          onPointerMove={trackPointer}
-          onPointerLeave={clearPointer}
+          onPointerDown={down}
+          onPointerMove={track}
+          onPointerUp={up}
+          onPointerCancel={cancel}
+          onPointerLeave={leave}
         />
         {decoding && <DecodingPlate {...decoding} />}
         {image && doc && doc.order.length === 0 && (
-          <EmptyPlate onDrawBox={onDrawBox} />
+          <EmptyPlate onDrawBox={actions.onDrawBox} />
         )}
       </div>
 

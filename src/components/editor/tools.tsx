@@ -7,10 +7,10 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
+import type { ToolId } from "@/interact/machine";
 import type { Annotation } from "@/model/types";
 
-export type ToolId =
-  "select" | "rect" | "arrow" | "highlight" | "text" | "pixelate";
+export type { ToolId };
 
 export interface Tool {
   id: ToolId;
@@ -18,8 +18,8 @@ export interface Tool {
   /** The single-key shortcut (wired in M18). */
   shortcut: string;
   icon: LucideIcon;
-  /** The milestone in which the tool starts to draw. */
-  from: string;
+  /** The milestone in which the tool starts to draw; absent once it does. */
+  from?: string;
 }
 
 /** The six tools, in the design file's order. */
@@ -29,9 +29,8 @@ export const TOOLS: Tool[] = [
     label: "Select",
     shortcut: "V",
     icon: MousePointer2,
-    from: "M5",
   },
-  { id: "rect", label: "Rectangle", shortcut: "R", icon: Square, from: "M5" },
+  { id: "rect", label: "Rectangle", shortcut: "R", icon: Square },
   {
     id: "arrow",
     label: "Arrow",

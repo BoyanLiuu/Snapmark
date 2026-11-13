@@ -64,7 +64,13 @@ export const App = () => {
   };
 
   return session ? (
-    <EditorShell session={session} onClose={close} />
+    <EditorShell
+      session={session}
+      onDocChange={(doc) =>
+        setSession((s) => (s?.state === "ready" ? { ...s, doc } : s))
+      }
+      onClose={close}
+    />
   ) : (
     <OpenScreen refusal={refusal} onFile={openFile} onSample={openSample} />
   );

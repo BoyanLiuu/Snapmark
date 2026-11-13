@@ -64,6 +64,7 @@ test("an image with nothing drawn says so, and Draw a box picks the rectangle", 
   await page
     .locator('input[type="file"]')
     .setInputFiles(join(import.meta.dirname, "files", "one-pixel.png"));
+  await expect(page.getByText(/^1\s×\s1\spx$/)).toBeVisible();
   const plate = page.getByTestId("nothing-drawn");
   await expect(plate).toContainText("Nothing drawn on this image yet");
   await expect(status(page)).toHaveText(

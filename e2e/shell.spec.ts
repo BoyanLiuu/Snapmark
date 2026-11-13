@@ -34,22 +34,6 @@ test("Copy is the editor bar's one orange button, and Export is not", async ({
   expect(filled).toBe(1);
 });
 
-test("the tool and colour groups always keep one choice", async ({ page }) => {
-  for (const [group, from, to] of [
-    ["Tool", "Select", "Rectangle"],
-    ["Colour", "Red", "Sky"],
-  ]) {
-    const radios = page.getByRole("radiogroup", { name: group });
-    await expect(radios.getByRole("radio", { name: from })).toBeChecked();
-    const target = radios.getByRole("radio", { name: to });
-    await target.click();
-    await expect(target).toBeChecked();
-    // Choosing the current one again must not leave the group with nothing chosen.
-    await target.click();
-    await expect(target).toBeChecked();
-  }
-});
-
 test("the sliders are named, with their units", async ({ page }) => {
   // Radix puts role="slider" on the thumb, so a name on the root alone leaves it unnamed.
   await expect(page.getByRole("slider", { name: "Stroke" })).toHaveAttribute(

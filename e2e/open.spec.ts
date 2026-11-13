@@ -31,12 +31,6 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("choosing a file opens it at its natural size", async ({ page }) => {
-  await choose(page, "one-pixel.png");
-  await opened(page, "one-pixel.png");
-  await expect(page.getByText(/^1\s×\s1\spx$/)).toBeVisible();
-});
-
 test("an EXIF-rotated photo opens upright", async ({ page }) => {
   // Stored 400 × 200 as red, green over blue, yellow, with Orientation 6 (turn 90° clockwise).
   await choose(page, "rotated.jpg");
@@ -99,22 +93,15 @@ test("a pasted image opens", async ({ page }) => {
   await opened(page, "image.png");
 });
 
-test("the sample opens from this app, credited", async ({ page }) => {
-  await page
-    .getByRole("button", { name: "Open the sample", exact: true })
-    .click();
-  await opened(page, "Lago-di-Braies.webp");
-  await expect(page.getByText(/^4554\s×\s3036\spx$/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "CC0" })).toBeVisible();
-});
-
-test("the sample's annotations are drawn, and hiding one takes it off the canvas", async ({
+test("the sample opens from this app, credited, its annotations drawn; hiding one removes it", async ({
   page,
 }) => {
   await page
     .getByRole("button", { name: "Open the sample", exact: true })
     .click();
   await opened(page, "Lago-di-Braies.webp");
+  await expect(page.getByText(/^4554\s×\s3036\spx$/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "CC0" })).toBeVisible();
   // The orange swatch as the canvas paints it; only the boathouse box uses it.
   const orange = await page.evaluate(
     (css) => {
