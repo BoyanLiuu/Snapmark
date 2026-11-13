@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * Snapmark is dark-only, so there is no light theme and no `.dark` class. The shadcn variables below
+ * are the design file's tokens (hallmark/tokens.css, app.css) mapped onto shadcn's names; the few
+ * with no shadcn equivalent keep the design file's own names (paper-3, ink-2, muted-2, rule-2).
+ */
+
+@theme inline {
+  --font-sans: var(--font-switzer), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  /* Snapmark-only: the well behind the image, quieter text and rules, the second accent. */
+  --color-paper-3: var(--paper-3);
+  --color-ink-2: var(--ink-2);
+  --color-muted-2: var(--muted-2);
+  --color-rule-2: var(--rule-2);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  /* The six annotation colours: content, not chrome. */
+  --color-swatch-red: var(--swatch-red);
+  --color-swatch-orange: var(--swatch-orange);
+  --color-swatch-yellow: var(--swatch-yellow);
+  --color-swatch-green: var(--swatch-green);
+  --color-swatch-sky: var(--swatch-sky);
+  --color-swatch-white: var(--swatch-white);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  color-scheme: dark;
+  /* paper, paper-2, paper-3 */
+  --background: oklch(9% 0.008 75);
+  --card: oklch(12.5% 0.009 75);
+  --popover: oklch(12.5% 0.009 75);
+  --paper-3: oklch(6.5% 0.007 75);
+  /* ink, ink-2, muted, muted-2 */
+  --foreground: oklch(94% 0.01 80);
+  --card-foreground: oklch(94% 0.01 80);
+  --popover-foreground: oklch(94% 0.01 80);
+  --ink-2: oklch(84% 0.011 80);
+  --secondary-foreground: var(--ink-2);
+  --muted-foreground: oklch(68% 0.012 80);
+  --muted-2: oklch(50% 0.01 80);
+  /* accent: the one orange, for the primary action (Copy); focus is its lighter step */
+  --primary: oklch(72% 0.17 45);
+  --primary-foreground: oklch(10% 0.02 45);
+  --ring: oklch(78% 0.15 45);
+  /* rule-2: quiet surfaces and row dividers; rule: hairlines */
+  --rule-2: oklch(16% 0.009 78);
+  --secondary: var(--rule-2);
+  --muted: var(--rule-2);
+  --accent: var(--rule-2);
+  --accent-foreground: oklch(94% 0.01 80);
+  --border: oklch(25% 0.01 78);
+  --input: oklch(25% 0.01 78);
+  --destructive: oklch(72% 0.15 27);
+  --info: oklch(74% 0.12 250);
+  --success: oklch(76% 0.13 150);
+  --swatch-red: oklch(63% 0.22 27);
+  --swatch-orange: oklch(72% 0.17 45);
+  --swatch-yellow: oklch(89% 0.17 98);
+  --swatch-green: oklch(74% 0.17 150);
+  --swatch-sky: oklch(74% 0.12 250);
+  --swatch-white: oklch(97% 0.006 80);
+  /* Square corners everywhere, as in the design file. */
+  --radius: 0;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+  }
+  /* The design file draws Lucide's paths with a 1.5 px square-capped stroke. */
+  .lucide {
+    stroke-width: 1.5;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+  }
+}

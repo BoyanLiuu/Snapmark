@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+.next
+.next-e2e
+out
+coverage
+test-results
+playwright-report
