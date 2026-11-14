@@ -23,8 +23,8 @@ decisions log.
 |                          | M8 — Export and Copy · **MVP**               | ✅ Done |
 | C · Kept and addressable | M9 — The library in this browser             | ✅ Done |
 |                          | M10 — Routes and dead ends                   | ✅ Done |
-| D · The learning goals   | M11 — The camera, zoom does not leak         | ⏭ Next  |
-|                          | M12 — Highlight and the four-pass compositor |         |
+| D · The learning goals   | M11 — The camera, zoom does not leak         | ✅ Done |
+|                          | M12 — Highlight and the four-pass compositor | ⏭ Next  |
 |                          | M13 — Text that exports identically          |         |
 |                          | M14 — Pixelate, kept live                    |         |
 | E · The whole flow board | M15 — Layers and multi-select                |         |
@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M10 — `pnpm check` green (format, typecheck, lint, 49 unit tests,
-build); `pnpm test:e2e` 72 passed (36 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M11 — `pnpm check` green (format, typecheck, lint, 52 unit tests,
+build); `pnpm test:e2e` 78 passed (39 checks, each at 2x and 1x).
 
 ---
 
@@ -350,11 +350,39 @@ Commit: `library: IndexedDB store keyed by image hash, with empty, loading and b
 - [x] Check (`e2e/routes.spec.ts` at 2x and 1x): screens 33 and 32 from their addresses; a box's
       address opened in a new tab has the same tool and the same box selected; the open page's
       and the editor's states from their parameters
-- [ ] Later: `edit` (M13), `zoom` and `at` (M11), `format` and the export's `state` (M16), more
-      than one id in `select` (M15)
+- [ ] Later: `edit` (M13), `format` and the export's `state` (M16), more than one id in
+      `select` (M15). (`zoom` and `at` arrived with M11.)
 
 Worth a look by eye:
 
 - [ ] Select a box, copy the address, open it in another tab
 
 Commit: `routing: addressable states for every screen`
+
+## M11 — The camera, zoom does not leak ✅
+
+- [x] `geom/camera.ts`: `zoomAt` reads the image point under the cursor before the scale changes,
+      clamped to 10%–800%; the view's state is `"fit"` or a scale and the image point at its centre
+- [x] The wheel and pinch zoom at the pointer; a trackpad's two fingers, Space-drag and the middle
+      button pan, whatever the tool — `components/editor/use-camera.ts`, `canvas-stage.tsx`
+- [x] Zoom out, zoom in (×1.25), Fit and 1:1 in the editor bar; the readout pairs the percentage
+      with the size, `400% · 4554 × 3036`; `?zoom=&at=` opens at a view and is written back once it
+      settles
+- [x] Already in place: smoothing off above 200%, hit tolerance and handles in screen px,
+      `minVisualStroke` 1 / scale in the view and 0 in the export
+- [x] Check (`src/geom/camera.test.ts`, `e2e/camera.spec.ts` at 2x and 1x): `zoomAt` keeps the
+      cursor's image point zooming in, out and at the clamp; **the sample copied at the fitted zoom
+      and at 244% is the same PNG, byte for byte**; the wheel keeps the pixel under the pointer, and
+      the zoom survives a reload through the address; Space-drag and the middle button pan by the
+      drag and draw nothing with the rectangle chosen. Proven by mutation: copying from the view
+      canvas fails the byte check; zooming about the origin fails the unit test
+- [x] Screen px reach no annotation: they are read only for the readout, the crosshair, the pan
+      and the 3 px drag threshold; every effect that changes the document carries image points
+
+Worth a look by eye:
+
+- [ ] At 25%, box two landmarks and export; undo, at 400% box the same two and export: the PNGs
+      agree within 1 px, strokes identical
+- [ ] Pinch on a trackpad and two-finger scroll: one zooms at the fingers, the other pans
+
+Commit: `camera: cursor-anchored zoom and pan, with zoom-independence proven`

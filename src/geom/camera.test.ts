@@ -1,5 +1,7 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { fit } from "./camera";
+import { fit, MAX_SCALE, zoomAt } from "./camera";
+import { toImage } from "./matrix";
 
 describe("fit", () => {
   it.each([
@@ -16,4 +18,22 @@ describe("fit", () => {
       expect(ty).toBeCloseTo(view.h - (ty + h), 9);
     },
   );
+});
+
+describe("zoomAt", () => {
+  const cam = { scale: 0.25, tx: 40, ty: -12 };
+  const cursor = { x: 611, y: 207 };
+
+  it.each([
+    ["zooming in", 1.25],
+    ["zooming out", 0.5],
+    ["clamped at 800%", 1000],
+  ])("keeps the image point under the cursor under it, %s", (_, k) => {
+    const before = toImage(cam, cursor);
+    const zoomed = zoomAt(cam, cursor, k);
+    const after = toImage(zoomed, cursor);
+    expect(after.x).toBeCloseTo(before.x, 9);
+    expect(after.y).toBeCloseTo(before.y, 9);
+    expect(zoomed.scale).toBeLessThanOrEqual(MAX_SCALE);
+  });
 });

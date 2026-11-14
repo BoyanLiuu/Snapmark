@@ -6,10 +6,9 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M10 of M0–M19 done: the MVP, the library, and an address for every screen.
-Open an image, draw boxes and arrows, undo, then Copy or export a PNG at the image's own size;
-images and their annotations stay in this browser, filed under the SHA-256 of their bytes. The
-camera, zoom and pan, is next.
+**Status:** M0–M11 of M0–M19 done: the MVP, the library, an address for every screen, and the
+camera. Open an image, zoom to the pixel, draw boxes and arrows, undo, then Copy or export a PNG at
+the image's own size, the same bytes at any zoom. The highlighter is next.
 See [MILESTONES.md](MILESTONES.md).
 
 ## Stack

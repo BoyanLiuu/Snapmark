@@ -1,11 +1,36 @@
 "use client";
 
-import { nbsp } from "@/lib/text";
+import { useSyncExternalStore } from "react";
 import { Minus, Plus, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { Store } from "@/lib/store";
+import { nbsp } from "@/lib/text";
+import type { StageCamera } from "./use-camera";
 import { TOOLS, type ToolId } from "./tools";
 import type { Copying } from "./use-copy";
+
+const ZOOM_STEP = 1.25;
+
+/** "400% · 3840 × 2407": the percentage never stands alone, so it can't be misread. */
+const ZoomReadout = ({
+  scale,
+  size,
+}: {
+  scale: Store<number | null>;
+  size: string;
+}) => {
+  const value = useSyncExternalStore(scale.subscribe, scale.get, scale.get);
+  return (
+    <output
+      data-testid="zoom-readout"
+      className="min-w-[15ch] px-2 text-center font-mono text-sm whitespace-nowrap text-ink-2 tabular-nums"
+    >
+      {nbsp(value === null ? size : `${Math.round(value * 100)}% · ${size}`) ||
+        "–"}
+    </output>
+  );
+};
 
 const copyLabel = (copy: Copying | null) => {
   if (copy?.downloads) return "Download PNG";
@@ -18,7 +43,9 @@ export interface EditorBarProps {
   /** Natural size in image px; null while a file decodes and its size isn't known yet. */
   natural: { w: number; h: number } | null;
   /** Screen px per image px (1 = one image pixel per CSS pixel); null until the first frame. */
-  zoom: number | null;
+  scale: Store<number | null>;
+  /** Null until the image is ready. */
+  camera: StageCamera | null;
   tool: ToolId;
   onToolChange: (tool: ToolId) => void;
   /** What undo and redo would step over; null when there is nothing to step. */
@@ -38,7 +65,8 @@ export interface EditorBarProps {
 export const EditorBar = ({
   fileName,
   natural,
-  zoom,
+  scale,
+  camera,
   tool,
   onToolChange,
   undoLabel,
@@ -131,20 +159,20 @@ export const EditorBar = ({
           variant="ghost"
           size="icon-control"
           aria-label="Zoom out"
-          title="Zoom arrives in M11"
+          title="Zoom out (−)"
+          disabled={!camera}
+          onClick={() => camera?.zoomBy(1 / ZOOM_STEP)}
         >
           <Minus />
         </Button>
-        <output className="min-w-[15ch] px-2 text-center font-mono text-sm whitespace-nowrap text-ink-2 tabular-nums">
-          {nbsp(
-            zoom === null ? size : `${Math.round(zoom * 100)}% · ${size}`,
-          ) || "–"}
-        </output>
+        <ZoomReadout scale={scale} size={size} />
         <Button
           variant="ghost"
           size="icon-control"
           aria-label="Zoom in"
-          title="Zoom arrives in M11"
+          title="Zoom in (+)"
+          disabled={!camera}
+          onClick={() => camera?.zoomBy(ZOOM_STEP)}
         >
           <Plus />
         </Button>
@@ -152,7 +180,9 @@ export const EditorBar = ({
           variant="outline"
           size="control"
           className="min-w-11 px-3"
-          title="Fit (⇧1) · arrives in M11"
+          title="Fit the whole image (⇧1)"
+          disabled={!camera}
+          onClick={camera?.fit}
         >
           Fit
         </Button>
@@ -160,7 +190,9 @@ export const EditorBar = ({
           variant="outline"
           size="control"
           className="min-w-11 px-3"
-          title="One image pixel per screen pixel (⇧0) · arrives in M11"
+          title="One image pixel per screen pixel (⇧0)"
+          disabled={!camera}
+          onClick={camera?.actualSize}
         >
           1:1
         </Button>

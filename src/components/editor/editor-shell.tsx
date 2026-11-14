@@ -1,13 +1,15 @@
 "use client";
 
 import { sizeText } from "@/lib/text";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { degenerate } from "@/geom/arrow";
 import type { History } from "@/history/undo";
 import { renderPng } from "@/export/render";
+import { MAX_SCALE, MIN_SCALE, type Zoom } from "@/geom/camera";
 import { drawn } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
 import { forced, go, setQuery, type Route } from "@/lib/route";
+import { createStore } from "@/lib/store";
 import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
@@ -28,6 +30,7 @@ import { LayerList } from "./layer-list";
 import { layerRows } from "./layers";
 import { statusLine } from "./status";
 import { Unreadable } from "./unreadable";
+import type { StageCamera } from "./use-camera";
 import { useCopy, type Notice } from "./use-copy";
 import { TOOL_IDS, type ToolId } from "./tools";
 
@@ -67,6 +70,17 @@ export interface Editing {
 
 const NONE: ReadonlySet<Id> = new Set();
 
+/** `?zoom=400&at=3010,975`: a scale in percent, and the image point at the view's centre. */
+const zoomFrom = (route: Route): Zoom => {
+  const percent = Number(route.query.get("zoom"));
+  if (!percent) return "fit";
+  const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, percent / 100));
+  const [x, y] = (route.query.get("at") ?? "").split(",").map(Number);
+  return Number.isFinite(x) && Number.isFinite(y)
+    ? { scale, at: { x, y } }
+    : { scale };
+};
+
 /** The image's name and natural size, known or not yet, whatever the state. */
 export const imageOf = (session: EditorSession) =>
   session.state === "ready"
@@ -105,7 +119,14 @@ export const EditorShell = ({
   const [selectedId, setSelectedId] = useState<Id | null>(
     () => route.query.get("select")?.split(",")[0] || null,
   );
-  const [zoom, setZoom] = useState<number | null>(null);
+  const [zoom] = useState(() => zoomFrom(route));
+  const [scale] = useState(() => createStore<number | null>(null));
+  const stage = useRef<StageCamera>(null);
+  const camera: StageCamera = {
+    zoomBy: (k) => stage.current?.zoomBy(k),
+    fit: () => stage.current?.fit(),
+    actualSize: () => stage.current?.actualSize(),
+  };
   const [notice, setNotice] = useState<Notice | null>(null);
   // The stroke follows the image's width until it is set by hand.
   const [defaults, setDefaults] = useState<
@@ -232,7 +253,8 @@ export const EditorShell = ({
         <EditorBar
           fileName={name}
           natural={natural}
-          zoom={ready ? zoom : null}
+          scale={scale}
+          camera={ready ? camera : null}
           tool={tool}
           onToolChange={(next) => {
             setTool(next);
@@ -255,7 +277,21 @@ export const EditorShell = ({
             selected={selected?.id ?? null}
             draft={draft}
             actions={actions}
-            onZoomChange={setZoom}
+            ref={stage}
+            zoom={zoom}
+            scale={scale}
+            onZoomSettle={(next) =>
+              setQuery(
+                next === "fit"
+                  ? { zoom: null, at: null }
+                  : {
+                      zoom: String(Math.round(next.scale * 100)),
+                      at: next.at
+                        ? `${Math.round(next.at.x)},${Math.round(next.at.y)}`
+                        : null,
+                    },
+              )
+            }
           >
             {unreadable && <Unreadable {...recovery} />}
           </CanvasStage>

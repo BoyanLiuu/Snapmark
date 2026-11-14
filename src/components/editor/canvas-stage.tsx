@@ -7,9 +7,10 @@ import {
   useSyncExternalStore,
   type PointerEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import { Button } from "@/components/ui/button";
-import { fit } from "@/geom/camera";
+import type { Zoom } from "@/geom/camera";
 import { hitTest } from "@/geom/hit";
 import { toImage } from "@/geom/matrix";
 import { CURSOR, handleAt, handlesOf } from "@/geom/handles";
@@ -38,6 +39,7 @@ import { drawOverlay, drawSelection } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
 import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
+import { useCamera, type StageCamera } from "./use-camera";
 import type { Notice } from "./use-copy";
 
 const POINTER_OFF = "Pointer off";
@@ -117,7 +119,8 @@ export interface StageActions {
 /**
  * The stage: `base` and `overlay` canvases over the status strip. Pointer events go through the
  * interaction machine; while a gesture runs the base draws its preview, and the document changes
- * once, on pointer-up.
+ * once, on pointer-up. Zoom and pan change only the camera, never the document (M11): the wheel
+ * zooms at the pointer, Space-drag or the middle button pans, whatever the tool.
  */
 export const CanvasStage = ({
   status,
@@ -128,7 +131,10 @@ export const CanvasStage = ({
   selected,
   draft,
   actions,
-  onZoomChange,
+  zoom,
+  scale,
+  onZoomSettle,
+  ref,
   children,
 }: {
   status: Notice | null;
@@ -140,7 +146,13 @@ export const CanvasStage = ({
   selected: Id | null;
   draft: (tool: DrawTool, from: Point, to: Point) => Annotation;
   actions: StageActions;
-  onZoomChange?: (scale: number) => void;
+  /** Where the view starts: fitted, or the address's `?zoom=&at=`. */
+  zoom: Zoom;
+  /** The camera's scale, for the editor bar's readout, without re-rendering the editor. */
+  scale: Store<number | null>;
+  /** After zooming or panning stops, for the address. */
+  onZoomSettle: (zoom: Zoom) => void;
+  ref?: Ref<StageCamera>;
   /** Covers the stage, and takes the pointer from it (screen 11). */
   children?: ReactNode;
 }) => {
@@ -158,7 +170,17 @@ export const CanvasStage = ({
   const selectedRef = useRefValue(selected);
   const draftRef = useRefValue(draft);
   const actionsRef = useRefValue(actions);
-  const onZoomRef = useRefValue(onZoomChange);
+  const panRef = useRef<Point | null>(null);
+  const spaceRef = useRef(false);
+  const { frameCamera, camera, setCamera } = useCamera({
+    viewRef,
+    imageRef,
+    overlayRef,
+    pointerRef,
+    zoom,
+    onSettle: onZoomSettle,
+    ref,
+  });
   const [cursor] = useState(() => createStore(POINTER_OFF));
   const [stats, setStats] = useState<ViewStats | null>(null);
   const debug = useDebug();
@@ -169,16 +191,12 @@ export const CanvasStage = ({
     const base = baseRef.current;
     const overlay = overlayRef.current;
     if (!container || !base || !overlay) return;
-    let scale: number | null = null;
     const scene = () => previewRef.current ?? docRef.current;
     const view = createView({
       container,
       base,
       overlay,
-      camera: (size) =>
-        imageRef.current
-          ? fit(imageRef.current.natural, { w: size.cssW, h: size.cssH })
-          : { scale: 1, tx: 0, ty: 0 },
+      camera: (size) => frameCamera({ w: size.cssW, h: size.cssH }),
       drawBase: (ctx, frame) => {
         const current = imageRef.current;
         const shown = scene();
@@ -202,10 +220,7 @@ export const CanvasStage = ({
         container.dataset.frames = String(next.frames);
         container.dataset.baseDraws = String(next.baseDraws);
         container.dataset.overlayDraws = String(next.overlayDraws);
-        if (imageRef.current && next.camera.scale !== scale) {
-          scale = next.camera.scale;
-          onZoomRef.current?.(scale);
-        }
+        if (imageRef.current) scale.set(next.camera.scale);
         if (debugRef.current) setStats(next);
       },
     });
@@ -291,6 +306,8 @@ export const CanvasStage = ({
   };
 
   const cursorFor = (at: PointerAt) => {
+    if (panRef.current) return "grabbing";
+    if (spaceRef.current) return "grab";
     const gesture = gestureRef.current;
     if (gesture.kind === "reshaping") return CURSOR[gesture.handle];
     if (gesture.kind === "moving") return "grabbing";
@@ -304,8 +321,15 @@ export const CanvasStage = ({
 
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     const at = pointerAt(event);
-    if (event.button !== 0 || !at || !docRef.current || !imageRef.current)
+    if (!at || !docRef.current || !imageRef.current) return;
+    if (event.button === 1 || (event.button === 0 && spaceRef.current)) {
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      panRef.current = at.screen;
+      event.currentTarget.style.cursor = "grabbing";
       return;
+    }
+    if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const grab = grabbed(at);
     const hit = grab ? null : hitAt(at);
@@ -319,6 +343,17 @@ export const CanvasStage = ({
     if (!at) return;
     pointerRef.current = at.screen;
     if (imageRef.current) cursor.set(cursorText(at.image));
+    const panFrom = panRef.current;
+    const cam = camera();
+    if (panFrom && cam) {
+      panRef.current = at.screen;
+      setCamera({
+        ...cam,
+        tx: cam.tx + at.screen.x - panFrom.x,
+        ty: cam.ty + at.screen.y - panFrom.y,
+      });
+      return;
+    }
     const gesture = move(gestureRef.current, at);
     if (gesture !== gestureRef.current) {
       gestureRef.current = gesture;
@@ -329,6 +364,11 @@ export const CanvasStage = ({
   };
 
   const up = (event: PointerEvent<HTMLCanvasElement>) => {
+    if (panRef.current) {
+      panRef.current = null;
+      event.currentTarget.style.cursor = spaceRef.current ? "grab" : "";
+      return;
+    }
     const at = pointerAt(event);
     const gesture = gestureRef.current;
     gestureRef.current = IDLE;
@@ -340,6 +380,7 @@ export const CanvasStage = ({
   };
 
   const cancel = () => {
+    panRef.current = null;
     gestureRef.current = IDLE;
     show(IDLE);
     viewRef.current?.invalidate("overlay");
@@ -352,7 +393,20 @@ export const CanvasStage = ({
   };
 
   // Esc drops a gesture in progress, or else the selection; Delete and Backspace remove it.
+  // Space held over the picture pans; anywhere else it presses whatever has focus.
   useEffect(() => {
+    const space = (event: KeyboardEvent) => {
+      if (event.key !== " ") return;
+      const down = event.type === "keydown";
+      if (down && (isTyping(event.target) || !pointerRef.current)) return;
+      if (!down && !spaceRef.current) return;
+      event.preventDefault();
+      spaceRef.current = down;
+      if (overlayRef.current && !panRef.current)
+        overlayRef.current.style.cursor = down ? "grab" : "";
+    };
+    window.addEventListener("keydown", space);
+    window.addEventListener("keyup", space);
     const key = (event: KeyboardEvent) => {
       if (isTyping(event.target)) return;
       if (event.key === "Escape") {
@@ -368,7 +422,11 @@ export const CanvasStage = ({
       }
     };
     window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("keydown", space);
+      window.removeEventListener("keyup", space);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

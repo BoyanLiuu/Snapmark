@@ -187,6 +187,7 @@ export const createView = ({
   return {
     /** The camera of the latest frame, for reading pointer events with `toImage`. */
     camera: () => camera,
+    size: () => size,
     /** Redraw the given layers on the next frame; both when none are given. */
     invalidate: (...layers: Layer[]) =>
       loop.invalidate(
