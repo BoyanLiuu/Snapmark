@@ -153,3 +153,18 @@ export const drawMarquee = (
     b.y - a.y,
   );
 };
+
+/** The stage outside the image, dimmed, so what the PNG will cut off looks cut off (screen 19). */
+export const drawGutter = (
+  ctx: CanvasRenderingContext2D,
+  { camera, size }: Frame,
+  natural: { w: number; h: number },
+) => {
+  const a = toScreen(camera, { x: 0, y: 0 });
+  const b = toScreen(camera, { x: natural.w, y: natural.h });
+  ctx.fillStyle = "oklch(6.5% 0.007 75 / 0.72)";
+  ctx.beginPath();
+  ctx.rect(0, 0, size.cssW, size.cssH);
+  ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
+  ctx.fill("evenodd");
+};

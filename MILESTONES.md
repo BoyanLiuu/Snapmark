@@ -29,12 +29,12 @@ decisions log.
 |                          | M14 — Pixelate, kept live                    | ✅ Done |
 | E · The whole flow board | M15 — Layers and multi-select                | ✅ Done |
 |                          | M16 — Export, the whole dialog               | ✅ Done |
-|                          | M17 — Out of bounds                          | ⏭ Next  |
-|                          | M18 — Shortcuts and keyboard                 |         |
+|                          | M17 — Out of bounds                          | ✅ Done |
+|                          | M18 — Shortcuts and keyboard                 | ⏭ Next  |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M16 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
-build); `pnpm test:e2e` 100 passed (50 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M17 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
+build); `pnpm test:e2e` 102 passed (51 checks, each at 2x and 1x).
 
 ---
 
@@ -473,3 +473,18 @@ Worth a look by eye:
 - [ ] Export a JPEG at 50% and at 100% and compare the file sizes
 
 Commit: `export: formats, limits and honest degradation`
+
+## M17 — Out of bounds ✅
+
+- [x] The overlay dims the stage outside the image
+- [x] A badge when anything runs past the edge, with Select it / Select them (screen 19)
+- [x] No clamping; Fit takes in what is past the edge, measured on open and on Fit only
+- [x] Check (`e2e/bounds.spec.ts` at 2x and 1x): an arrow drawn out past the top raises the badge;
+      the overlay is dimmed outside the image and clear inside it; drawing it doesn't move the view;
+      Select it selects it; Fit then zooms out to take it in
+
+Worth a look by eye:
+
+- [ ] Export with an arrow half outside: the PNG is the image's size, the arrow cut at the edge
+
+Commit: `bounds: out-of-bounds gutter and badge`

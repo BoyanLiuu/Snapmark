@@ -9,6 +9,7 @@ import {
 } from "react";
 import { cameraFor, zoomAt, zoomOf, type Zoom } from "@/geom/camera";
 import type { Camera } from "@/geom/matrix";
+import type { Box } from "@/model/bbox";
 import { debounced } from "@/lib/debounce";
 import { useRefValue } from "@/lib/use-ref-value";
 import type { LoadedImage } from "@/model/image";
@@ -49,6 +50,7 @@ export const useCamera = ({
   imageRef,
   overlayRef,
   pointerRef,
+  extentOf,
   zoom,
   onSettle,
   ref,
@@ -57,11 +59,17 @@ export const useCamera = ({
   imageRef: RefObject<Pick<LoadedImage, "natural"> | null>;
   overlayRef: RefObject<HTMLCanvasElement | null>;
   pointerRef: RefObject<Point | null>;
+  /** The image and what is drawn past its edge, for Fit; null when nothing is. */
+  extentOf: () => Box | null;
   zoom: Zoom;
   onSettle: (zoom: Zoom) => void;
   ref?: Ref<StageCamera>;
 }) => {
   const zoomRef = useRef(zoom);
+  // Measured when the image opens and when Fit is pressed, not as things are drawn, so the view
+  // never jumps under the pointer.
+  const extentRef = useRef<Box | null>(null);
+  const extentOfRef = useRefValue(extentOf);
   const onSettleRef = useRefValue(onSettle);
   const settleRef = useRef<ReturnType<typeof debounced<Zoom>>>(null);
 
@@ -74,7 +82,12 @@ export const useCamera = ({
   const frameCamera = (size: Size): Camera => {
     const image = imageRef.current;
     return image
-      ? cameraFor(zoomRef.current, image.natural, size)
+      ? cameraFor(
+          zoomRef.current,
+          image.natural,
+          size,
+          extentRef.current ?? undefined,
+        )
       : { scale: 1, tx: 0, ty: 0 };
   };
 
@@ -92,6 +105,11 @@ export const useCamera = ({
     viewRef.current?.invalidate();
   };
 
+  /** Takes in what is drawn past the image's edge: as the image opens, and on Fit. */
+  const measure = () => {
+    extentRef.current = extentOfRef.current();
+  };
+
   const setCamera = (next: Camera) => setZoom(zoomOf(next, viewSize()));
 
   const zoomAtCentre = (k: (cam: Camera) => number) => {
@@ -104,7 +122,10 @@ export const useCamera = ({
     ref,
     () => ({
       zoomBy: (k) => zoomAtCentre(() => k),
-      fit: () => setZoom("fit"),
+      fit: () => {
+        measure();
+        setZoom("fit");
+      },
       actualSize: () => zoomAtCentre((cam) => 1 / cam.scale),
     }),
     // Every value it reads is a ref.
@@ -143,5 +164,5 @@ export const useCamera = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { frameCamera, camera, setCamera };
+  return { frameCamera, camera, setCamera, measure };
 };

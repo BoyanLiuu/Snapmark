@@ -14,6 +14,7 @@ import { createStore } from "@/lib/store";
 import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
+  annotations,
   inOrder,
   reorder,
   removeAnnotations,
@@ -21,6 +22,7 @@ import {
   updateAnnotation,
   withoutIds,
 } from "@/model/doc";
+import { pastEdge } from "@/model/bbox";
 import type { LoadedImage } from "@/model/image";
 import type { Annotation, Doc, Id, Point, Size, TextA } from "@/model/types";
 import { SampleNotice } from "../open/sample-notice";
@@ -33,6 +35,7 @@ import { Kbd } from "./kbd";
 import { LayerList } from "./layer-list";
 import { layerRows } from "./layers";
 import { statusLine } from "./status";
+import { EdgeBadge } from "./edge-badge";
 import { Unreadable } from "./unreadable";
 import type { StageCamera } from "./use-camera";
 import { useCopy, type Notice } from "./use-copy";
@@ -167,6 +170,9 @@ export const EditorShell = ({
     if (!editingId) return withoutIds(doc, hidden);
     return withoutIds(doc, new Set([...hidden, editingId]));
   }, [doc, hidden, editingId]);
+  // What runs past the image's edge, of what shows: the PNG will cut it off (screen 19).
+  const past =
+    shown && natural ? pastEdge(annotations(shown), natural.w, natural.h) : [];
   const style: Style = {
     ...defaults,
     strokeWidth: defaults.strokeWidth ?? defaultStroke(naturalWidth),
@@ -380,11 +386,22 @@ export const EditorShell = ({
                     },
               )
             }
+            cover={
+              unreadable && (
+                <Unreadable
+                  retry={actions.retry}
+                  startFresh={actions.startFresh}
+                />
+              )
+            }
           >
-            {unreadable && (
-              <Unreadable
-                retry={actions.retry}
-                startFresh={actions.startFresh}
+            {past.length > 0 && (
+              <EdgeBadge
+                count={past.length}
+                onSelect={() => {
+                  actions.select(past.map((a) => a.id));
+                  actions.setTool("select");
+                }}
               />
             )}
           </CanvasStage>

@@ -74,3 +74,21 @@ export const union = (boxes: readonly Box[]): Box => {
   const bottom = Math.max(...boxes.map((b) => b.y + b.h));
   return { x, y, w: right - x, h: bottom - y };
 };
+
+/** Half a pixel of give, so an edge drawn exactly on the image's edge isn't past it. */
+const EDGE = 0.5;
+
+/** The annotations whose painted box runs past the image's edge: the PNG cuts them off. */
+export const pastEdge = (list: readonly Annotation[], w: number, h: number) =>
+  list.filter((a) => {
+    const b = bbox(a);
+    return (
+      b.x < -EDGE || b.y < -EDGE || b.x + b.w > w + EDGE || b.y + b.h > h + EDGE
+    );
+  });
+
+/** The image and what runs past its edge, for Fit; null when nothing does. */
+export const extentOf = (list: readonly Annotation[], w: number, h: number) => {
+  const past = pastEdge(list, w, h);
+  return past.length ? union([{ x: 0, y: 0, w, h }, ...past.map(bbox)]) : null;
+};

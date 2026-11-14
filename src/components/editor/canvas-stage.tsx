@@ -40,14 +40,15 @@ import { createStore, type Store } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { isTyping } from "@/lib/typing";
 import { useRefValue } from "@/lib/use-ref-value";
-import { outline, union, type Box } from "@/model/bbox";
+import { extentOf, outline, union, type Box } from "@/model/bbox";
 import { tagOf } from "@/model/describe";
 import { sizeText } from "@/lib/text";
-import { inOrder } from "@/model/doc";
+import { annotations, inOrder } from "@/model/doc";
 import type { LoadedImage } from "@/model/image";
 import type { Annotation, Doc, Id, Point, Size, TextA } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
 import {
+  drawGutter,
   drawMarquee,
   drawMember,
   drawOverlay,
@@ -167,6 +168,7 @@ export const CanvasStage = ({
   onZoomSettle,
   writing,
   ref,
+  cover,
   children,
 }: {
   status: Notice | null;
@@ -188,6 +190,8 @@ export const CanvasStage = ({
   writing: Writing | null;
   ref?: Ref<StageCamera>;
   /** Covers the stage, and takes the pointer from it (screen 11). */
+  cover?: ReactNode;
+  /** Shown over the stage, not taking the pointer from it: the out-of-bounds badge (M17). */
   children?: ReactNode;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -209,11 +213,19 @@ export const CanvasStage = ({
   const textRef = useRef<HTMLTextAreaElement>(null);
   const writingRef = useRefValue(writing);
   const spaceRef = useRef(false);
-  const { frameCamera, camera, setCamera } = useCamera({
+  const extent = () => {
+    const natural = imageRef.current?.natural;
+    const shown = docRef.current;
+    return natural && shown
+      ? extentOf(annotations(shown), natural.w, natural.h)
+      : null;
+  };
+  const { frameCamera, camera, setCamera, measure } = useCamera({
     viewRef,
     imageRef,
     overlayRef,
     pointerRef,
+    extentOf: extent,
     zoom,
     onSettle: onZoomSettle,
     ref,
@@ -240,8 +252,9 @@ export const CanvasStage = ({
         if (current && shown) drawImageLayer(ctx, frame, shown, current.bitmap);
       },
       drawOverlay: (ctx, frame) => {
-        drawOverlay(ctx, frame, pointerRef.current);
         const shown = scene();
+        if (imageRef.current) drawGutter(ctx, frame, imageRef.current.natural);
+        drawOverlay(ctx, frame, pointerRef.current);
         if (!shown) return;
         const gesture = gestureRef.current;
         if (gesture.kind === "marquee") {
@@ -291,9 +304,14 @@ export const CanvasStage = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The image has arrived, with its document: Fit takes in what is drawn past its edge.
+  const opened = Boolean(image && doc);
   useEffect(() => {
+    measure();
     viewRef.current?.invalidate();
-  }, [image]);
+    // measure reads refs only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [image, opened]);
 
   // A committed change has arrived: the preview that stood in for it can go.
   useEffect(() => {
@@ -550,7 +568,7 @@ export const CanvasStage = ({
           onMouseDown={(event) => event.preventDefault()}
         />
         {decoding && <DecodingPlate {...decoding} />}
-        {image && doc && doc.order.length === 0 && !children && (
+        {image && doc && doc.order.length === 0 && !cover && (
           <EmptyPlate onDrawBox={actions.onDrawBox} />
         )}
         {writing && (
@@ -562,6 +580,7 @@ export const CanvasStage = ({
           />
         )}
         {children}
+        {cover}
       </div>
 
       <div

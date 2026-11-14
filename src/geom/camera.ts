@@ -1,4 +1,5 @@
 import type { Point, Size } from "@/model/types";
+import type { Box } from "@/model/bbox";
 import { toImage, type Camera } from "./matrix";
 
 /** A fitted image fills 95% of its limiting axis, leaving breathing room around it. */
@@ -11,6 +12,16 @@ export const fit = (nat: Size, view: Size, breathing = BREATHING): Camera => {
     scale,
     tx: (view.w - nat.w * scale) / 2,
     ty: (view.h - nat.h * scale) / 2,
+  };
+};
+
+/** The camera that shows the whole of `box`, centred: the image and anything drawn past it. */
+export const fitBox = (box: Box, view: Size, breathing = BREATHING): Camera => {
+  const scale = Math.min(view.w / box.w, view.h / box.h) * breathing;
+  return {
+    scale,
+    tx: (view.w - box.w * scale) / 2 - box.x * scale,
+    ty: (view.h - box.h * scale) / 2 - box.y * scale,
   };
 };
 
@@ -41,11 +52,24 @@ export const zoomAt = (cam: Camera, cursor: Point, k: number): Camera => {
  */
 export type Zoom = "fit" | { scale: number; at?: Point };
 
-/** The camera for a zoom state; with no `at`, the image's centre. */
-export const cameraFor = (zoom: Zoom, nat: Size, view: Size): Camera =>
-  zoom === "fit"
-    ? fit(nat, view)
-    : centreOn(zoom.at ?? { x: nat.w / 2, y: nat.h / 2 }, zoom.scale, view);
+/**
+ * The camera for a zoom state; with no `at`, the image's centre. Fit takes in `extent` too, what
+ * is drawn past the image's edge (M17), so nothing drawn is ever out of sight.
+ */
+export const cameraFor = (
+  zoom: Zoom,
+  nat: Size,
+  view: Size,
+  extent?: Box,
+): Camera => {
+  if (zoom !== "fit")
+    return centreOn(
+      zoom.at ?? { x: nat.w / 2, y: nat.h / 2 },
+      zoom.scale,
+      view,
+    );
+  return extent ? fitBox(extent, view) : fit(nat, view);
+};
 
 export const zoomOf = (cam: Camera, view: Size): Zoom => ({
   scale: cam.scale,
