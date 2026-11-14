@@ -18,8 +18,6 @@ export interface Tool {
   /** The single-key shortcut (wired in M18). */
   shortcut: string;
   icon: LucideIcon;
-  /** The milestone in which the tool starts to draw; absent once it does. */
-  from?: string;
 }
 
 /** The six tools, in the design file's order. */
@@ -44,7 +42,6 @@ export const TOOLS: Tool[] = [
     label: "Pixelate",
     shortcut: "P",
     icon: Grid3x3,
-    from: "M14",
   },
 ];
 

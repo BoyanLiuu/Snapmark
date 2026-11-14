@@ -10,7 +10,8 @@ export interface Look {
 
 /**
  * What a drag from `from` to `to` draws with this tool: a box whichever way it went, an arrow tail
- * first. A highlight is a marker, so red, the default, becomes yellow (as the design file does).
+ * first. A highlight is a marker, so red, the default, becomes yellow; a pixelate region's blocks
+ * are the image's width ÷ 280, at least 8 px (as the design file does both).
  */
 export const drawn = (
   tool: DrawTool,
@@ -18,6 +19,7 @@ export const drawn = (
   to: Point,
   look: Look,
   id: string,
+  naturalWidth: number,
 ): Annotation => {
   if (tool === "arrow")
     return {
@@ -42,6 +44,15 @@ export const drawn = (
       ...look,
       color: look.color === "red" ? "yellow" : look.color,
       ...box,
+    };
+  if (tool === "pixelate")
+    return {
+      id,
+      kind: "pixelate",
+      ...look,
+      color: "white",
+      ...box,
+      block: Math.max(8, Math.round(naturalWidth / 280)),
     };
   return { id, kind: "rect", ...look, ...box };
 };

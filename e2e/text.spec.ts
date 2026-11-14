@@ -38,6 +38,8 @@ test("the text tool writes a label; double-click edits it in place, and Esc leav
 
   await page.mouse.dblclick(at.x, at.y);
   await expect(editor(page)).toHaveValue("Taxi waiting in the red lane");
+  // It takes focus on the frame that places it.
+  await expect(editor(page)).toBeFocused();
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type("Taxi in the bus lane");
   await page.keyboard.press("ControlOrMeta+Enter");

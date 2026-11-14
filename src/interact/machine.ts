@@ -10,7 +10,7 @@ import type { Annotation, Doc, Id, Point } from "@/model/types";
 export type ToolId =
   "select" | "rect" | "arrow" | "highlight" | "text" | "pixelate";
 
-const DRAW_TOOLS = ["rect", "arrow", "highlight"] as const;
+const DRAW_TOOLS = ["rect", "arrow", "highlight", "pixelate"] as const;
 
 export type DrawTool = (typeof DRAW_TOOLS)[number];
 

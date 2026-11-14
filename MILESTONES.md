@@ -26,15 +26,15 @@ decisions log.
 | D · The learning goals   | M11 — The camera, zoom does not leak         | ✅ Done |
 |                          | M12 — Highlight and the four-pass compositor | ✅ Done |
 |                          | M13 — Text that exports identically          | ✅ Done |
-|                          | M14 — Pixelate, kept live                    | ⏭ Next  |
-| E · The whole flow board | M15 — Layers and multi-select                |         |
+|                          | M14 — Pixelate, kept live                    | ✅ Done |
+| E · The whole flow board | M15 — Layers and multi-select                | ⏭ Next  |
 |                          | M16 — Export, the whole dialog               |         |
 |                          | M17 — Out of bounds                          |         |
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M13 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
-build); `pnpm test:e2e` 84 passed (42 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M14 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
+build); `pnpm test:e2e` 88 passed (44 checks, each at 2x and 1x).
 
 ---
 
@@ -419,3 +419,19 @@ Worth a look by eye:
 - [ ] Drag a long label around: no drop in frame rate
 
 Commit: `text: wrapped canvas text with plate and DOM editing overlay`
+
+## M14 — Pixelate, kept live ✅
+
+- [x] A region stores its box and block size, and is recomputed from the source on every draw,
+      in the pass before highlights (since M3)
+- [x] The pixelate tool, with blocks of width ÷ 280 (at least 8 px), and a Block slider
+- [x] Check (`e2e/pixelate.spec.ts` at 2x and 1x): with an arrow drawn first and a region over it,
+      the copied PNG's blocks are one colour each and the arrow under the region stays red; after a
+      reload the region is selected from the address and its block size changes. Proven by
+      mutation: drawing pixelate in paint order fails it
+
+Worth a look by eye:
+
+- [ ] Pixelate a face, export, and zoom into the PNG: the detail is gone, not blurred
+
+Commit: `pixelate: live redaction recomputed from source each render`

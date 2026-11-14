@@ -72,7 +72,7 @@ const labelOf = (writing: Writing | null, doc: Doc | null): TextA | null => {
 };
 
 /** The inspector's sliders: a drag of one is a single undo entry. */
-const SLIDERS = new Set(["strokeWidth", "opacity", "fontSize"]);
+const SLIDERS = new Set(["strokeWidth", "opacity", "fontSize", "block"]);
 
 /** `?zoom=400&at=3010,975`: a scale in percent, and the image point at the view's centre. */
 const zoomFrom = (route: Route): Zoom => {
@@ -140,6 +140,7 @@ export const EditorShell = ({
 
   const ready = session.state === "ready" ? session : null;
   const { name, natural } = imageOf(session);
+  const naturalWidth = natural?.w ?? 0;
   // While the stored annotations can't be read, the picture shows under screen 11 with none.
   const unreadable = ready?.unreadable ?? false;
   const doc = ready?.doc ?? null;
@@ -155,7 +156,7 @@ export const EditorShell = ({
   }, [doc, hidden, editingId]);
   const style: Style = {
     ...defaults,
-    strokeWidth: defaults.strokeWidth ?? defaultStroke(natural?.w ?? 0),
+    strokeWidth: defaults.strokeWidth ?? defaultStroke(naturalWidth),
   };
   const history = ready?.history;
 
@@ -165,12 +166,12 @@ export const EditorShell = ({
   };
 
   const draft = (kind: DrawTool, from: Point, to: Point) =>
-    drawn(kind, from, to, style, "draft");
+    drawn(kind, from, to, style, "draft", naturalWidth);
 
   const stageActions: StageActions = {
     onSelect: actions.select,
     onDraw: (kind, from, to) => {
-      const a = drawn(kind, from, to, style, newId());
+      const a = drawn(kind, from, to, style, newId(), naturalWidth);
       if (a.kind === "arrow" && degenerate(a)) return;
       edit((d) => addAnnotation(d, a), "Draw");
       actions.select(a.id);

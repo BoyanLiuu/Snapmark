@@ -102,16 +102,12 @@ export const EditorBar = ({
         // A single-choice group: clicking the current tool keeps it rather than clearing it.
         onValueChange={(value) => value && onToolChange(value as ToolId)}
       >
-        {TOOLS.map(({ id, label, shortcut, icon: Icon, from }) => (
+        {TOOLS.map(({ id, label, shortcut, icon: Icon }) => (
           <ToggleGroupItem
             key={id}
             value={id}
             aria-label={label}
-            title={
-              from
-                ? `${label} (${shortcut}) · draws from ${from}`
-                : `${label} (${shortcut})`
-            }
+            title={`${label} (${shortcut})`}
             className="relative size-9 min-w-9 px-0 text-ink-2 hover:bg-card hover:text-foreground data-[state=on]:bg-paper-3 data-[state=on]:text-foreground data-[state=on]:shadow-[inset_0_0_0_1px_var(--border)] data-[state=on]:after:absolute data-[state=on]:after:top-[3px] data-[state=on]:after:right-[3px] data-[state=on]:after:size-[5px] data-[state=on]:after:bg-primary"
           >
             <Icon className="size-5" />

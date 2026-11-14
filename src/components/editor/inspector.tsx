@@ -10,7 +10,7 @@ import { defaultStroke } from "@/interact/draft";
 import { outline } from "@/model/bbox";
 import { KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
-import type { Annotation, TextA } from "@/model/types";
+import type { Annotation, PixelateA, TextA } from "@/model/types";
 
 // Tailwind needs whole class names, so each swatch's classes are spelled out here.
 const SWATCH_CLASS: Record<SwatchId, string> = {
@@ -108,8 +108,10 @@ const factsOf = (a: Annotation): [string, string][][] => {
   ];
 };
 
-/** What the inspector changes: the look, and a label's size and plate. */
-export type StylePatch = Partial<Style & Pick<TextA, "fontSize" | "plate">>;
+/** What the inspector changes: the look, a label's size and plate, a region's block size. */
+export type StylePatch = Partial<
+  Style & Pick<TextA, "fontSize" | "plate"> & Pick<PixelateA, "block">
+>;
 
 /** The look a new annotation is drawn with, and what the inspector edits on a selected one. */
 export interface Style {
@@ -223,6 +225,19 @@ export const Inspector = ({
             Plate behind the text
           </label>
         </>
+      )}
+      {selected?.kind === "pixelate" && (
+        <RangeField
+          id="block"
+          label="Block"
+          value={Math.round(selected.block)}
+          min={4}
+          max={120}
+          unit={"\u00a0px"}
+          help="Recomputed from the original on every render, so it stays editable."
+          onChange={(block) => onChange({ block })}
+          onCommit={onCommit}
+        />
       )}
       <RangeField
         id="opacity"

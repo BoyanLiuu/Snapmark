@@ -62,6 +62,8 @@ test("the wheel zooms at the pointer, keeping the pixel under it, and the addres
   page,
 }) => {
   await openChart(page);
+  // The readout has a percentage from the first frame on.
+  await expect(zoomReadout(page)).toHaveText(/^\d+%/);
   const fitted = await percent(page);
   const a = await onPage(page, A);
   const readout = page.getByTestId("cursor-readout");
