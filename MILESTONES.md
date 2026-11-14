@@ -28,13 +28,13 @@ decisions log.
 |                          | M13 — Text that exports identically          | ✅ Done |
 |                          | M14 — Pixelate, kept live                    | ✅ Done |
 | E · The whole flow board | M15 — Layers and multi-select                | ✅ Done |
-|                          | M16 — Export, the whole dialog               | ⏭ Next  |
-|                          | M17 — Out of bounds                          |         |
+|                          | M16 — Export, the whole dialog               | ✅ Done |
+|                          | M17 — Out of bounds                          | ⏭ Next  |
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M15 — `pnpm check` green (format, typecheck, lint, 56 unit tests,
-build); `pnpm test:e2e` 94 passed (47 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M16 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
+build); `pnpm test:e2e` 100 passed (50 checks, each at 2x and 1x).
 
 ---
 
@@ -350,8 +350,8 @@ Commit: `library: IndexedDB store keyed by image hash, with empty, loading and b
 - [x] Check (`e2e/routes.spec.ts` at 2x and 1x): screens 33 and 32 from their addresses; a box's
       address opened in a new tab has the same tool and the same box selected; the open page's
       and the editor's states from their parameters
-- [ ] Later: `format` and the export's `state` (M16). (`zoom` and `at` arrived with M11, `edit`
-      with M13, several ids in `select` with M15.)
+- [x] Every parameter is read now: `zoom` and `at` from M11, `edit` from M13, several ids in
+      `select` from M15, `format` and the export's `state` from M16
 
 Worth a look by eye:
 
@@ -454,3 +454,22 @@ Worth a look by eye:
 - [ ] Eight annotations list with image-px sizes that match the inspector's
 
 Commit: `layers: z-order list, visibility and marquee multi-select`
+
+## M16 — Export, the whole page ✅
+
+- [x] PNG to copy or download, JPEG to download with a quality slider, annotations as W3C Web
+      Annotation JSON to copy or download (screens 26, 27)
+- [x] A JSON file dropped on the editor puts its annotations back onto the image it names
+- [x] `export/limits.ts`: a 64 MP budget and 16,384 px a side; over it the export is drawn smaller
+      by one factor and says so (28); drawing (29), nothing drawn (30) and an unreadable image (31)
+- [x] Check (`src/export/annotations.test.ts`, `e2e/export-formats.spec.ts` at 2x and 1x): JSON
+      round-trips and is refused for another image; exported JSON dropped back on the editor puts a
+      deleted box back where it was; a 72 MP image exports at 11313 × 5656 with its corner still in
+      the corner; JPEG downloads as a JPEG and has no Copy; the states come from the address. Proven
+      by mutation: a render that forgets to scale fails the corner
+
+Worth a look by eye:
+
+- [ ] Export a JPEG at 50% and at 100% and compare the file sizes
+
+Commit: `export: formats, limits and honest degradation`

@@ -36,6 +36,7 @@ import { statusLine } from "./status";
 import { Unreadable } from "./unreadable";
 import type { StageCamera } from "./use-camera";
 import { useCopy, type Notice } from "./use-copy";
+import { useJsonImport } from "./use-json-import";
 
 /** An open image: decoding (screen 08), or ready with its document and its history. */
 export type EditorSession =
@@ -257,6 +258,8 @@ export const EditorShell = ({
       group,
     );
   };
+
+  useJsonImport(setNotice);
 
   const copying = useCopy(
     () =>

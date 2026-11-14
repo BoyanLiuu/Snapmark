@@ -4,10 +4,10 @@ import { useRef, useState } from "react";
 import {
   clipboardSupport,
   copyPng,
-  downloadPng,
+  downloadBlob,
   type ClipboardSupport,
 } from "@/export/clipboard";
-import { pngName } from "@/export/render";
+import { exportName } from "@/export/render";
 import { forced, type Route } from "@/lib/route";
 
 export interface Notice {
@@ -48,8 +48,8 @@ export const useCopy = (
   const downloads = support !== "ok" || blocked;
 
   const download = () => {
-    const file = pngName(name);
-    downloadPng(png(), file).then(
+    const file = exportName(name);
+    downloadBlob(png(), file).then(
       () =>
         onNotice({
           text: support === "ok" ? `Downloaded ${file}.` : WHY[support],

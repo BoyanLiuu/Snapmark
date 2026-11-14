@@ -20,8 +20,8 @@ export const clipboardSupport = (): ClipboardSupport => {
 export const copyPng = (png: Promise<Blob>) =>
   navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
 
-export const downloadPng = async (png: Promise<Blob>, name: string) => {
-  const url = URL.createObjectURL(await png);
+export const downloadBlob = async (blob: Promise<Blob>, name: string) => {
+  const url = URL.createObjectURL(await blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = name;
