@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { fit, MAX_SCALE, zoomAt } from "./camera";
+import { fit, MAX_SCALE, pinched, zoomAt } from "./camera";
 import { toImage } from "./matrix";
 
 describe("fit", () => {
@@ -35,5 +35,27 @@ describe("zoomAt", () => {
     expect(after.x).toBeCloseTo(before.x, 9);
     expect(after.y).toBeCloseTo(before.y, 9);
     expect(zoomed.scale).toBeLessThanOrEqual(MAX_SCALE);
+  });
+});
+
+describe("pinched", () => {
+  it("fingers twice as far apart, about the same middle: twice the scale, that middle kept", () => {
+    const cam = { scale: 0.5, tx: 10, ty: 20 };
+    const middle = { x: 200, y: 100 };
+    const next = pinched(
+      cam,
+      [
+        { x: 160, y: 100 },
+        { x: 240, y: 100 },
+      ],
+      [
+        { x: 120, y: 100 },
+        { x: 280, y: 100 },
+      ],
+    );
+    expect(next.scale).toBeCloseTo(1, 9);
+    const kept = toImage(next, middle);
+    expect(kept.x).toBeCloseTo(toImage(cam, middle).x, 9);
+    expect(kept.y).toBeCloseTo(toImage(cam, middle).y, 9);
   });
 });

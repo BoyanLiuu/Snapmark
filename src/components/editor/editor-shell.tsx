@@ -309,11 +309,12 @@ export const EditorShell = ({
   useShortcuts(camera, copyRef);
 
   return (
-    <div className="flex h-dvh min-h-[560px] flex-col">
+    // On a phone (screens 35, 36) the page scrolls: the stage, then the inspector and layers below.
+    <div className="flex h-dvh min-h-[560px] flex-col max-[40rem]:h-auto max-[40rem]:min-h-dvh">
       <AppBar variant="app" onHome={onHome} />
       <main
         aria-labelledby="editor-file"
-        className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]"
+        className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] max-[40rem]:flex-none max-[40rem]:grid-rows-[auto_auto]"
       >
         <EditorBar
           fileName={name}
@@ -332,7 +333,7 @@ export const EditorShell = ({
           copy={ready ? copying : null}
           onExport={exportPage}
         />
-        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px] max-[40rem]:grid-cols-1 max-[40rem]:grid-rows-[18rem_auto]">
           <CanvasStage
             status={status()}
             image={ready?.image ?? null}
@@ -383,7 +384,7 @@ export const EditorShell = ({
           </CanvasStage>
           <aside
             aria-label="Inspector and layers"
-            className="flex min-h-0 flex-col overflow-y-auto border-l bg-card"
+            className="flex min-h-0 flex-col overflow-y-auto border-l bg-card max-[40rem]:overflow-visible max-[40rem]:border-t max-[40rem]:border-l-0"
           >
             {ready && !unreadable ? (
               <Inspector

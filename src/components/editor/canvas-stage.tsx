@@ -11,8 +11,8 @@ import {
   type Ref,
 } from "react";
 import { Button } from "@/components/ui/button";
-import type { Zoom } from "@/geom/camera";
-import { toImage } from "@/geom/matrix";
+import { pinched, type Zoom } from "@/geom/camera";
+import { toImage, type Camera } from "@/geom/matrix";
 import {
   boxHandles,
   CURSOR,
@@ -20,7 +20,7 @@ import {
   handleAt,
   handlesOf,
 } from "@/geom/handles";
-import { hitTest, touching } from "@/geom/hit";
+import { hitTest, TOUCH_SLOP, touching } from "@/geom/hit";
 import {
   between,
   IDLE,
@@ -63,6 +63,9 @@ import type { Notice } from "./use-copy";
 
 const POINTER_OFF = "Pointer off";
 
+/** How much further than a mouse a press reaches: a finger is less exact. */
+const slopOf = (at: PointerAt) => (at.touch ? TOUCH_SLOP : 1);
+
 /** A group's tag: the size of the box around it, in image px. */
 const sizeOf = (box: Box) =>
   sizeText({ w: Math.round(box.w), h: Math.round(box.h) });
@@ -77,7 +80,7 @@ const CursorReadout = ({ store }: { store: Store<string> }) => {
     <p
       aria-hidden
       data-testid="cursor-readout"
-      className="min-w-[15ch] font-mono whitespace-nowrap text-muted-foreground tabular-nums"
+      className="min-w-[15ch] font-mono whitespace-nowrap text-muted-foreground tabular-nums max-[40rem]:hidden"
     >
       {text}
     </p>
@@ -344,7 +347,38 @@ export const CanvasStage = ({
       screen,
       image: toImage(view.camera(), screen),
       shift: event.shiftKey,
+      touch: "pointerType" in event && event.pointerType === "touch",
     };
+  };
+
+  /** Keeps a drag's events coming past the canvas's edge; a synthetic pointer can't be captured. */
+  const capture = (event: PointerEvent<HTMLCanvasElement>) => {
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Nothing to capture.
+    }
+  };
+
+  // The fingers on the stage, and a pinch once there are two of them.
+  const touchesRef = useRef(new Map<number, Point>());
+  const pinchRef = useRef<{ a: Point; b: Point; camera: Camera } | null>(null);
+
+  const startPinch = () => {
+    const [a, b] = [...touchesRef.current.values()];
+    const cam = camera();
+    if (!cam) return;
+    gestureRef.current = IDLE;
+    panRef.current = null;
+    show(IDLE);
+    pinchRef.current = { a, b, camera: cam };
+  };
+
+  const pinchTo = () => {
+    const pinch = pinchRef.current;
+    const [a, b] = [...touchesRef.current.values()];
+    if (pinch && a && b)
+      setCamera(pinched(pinch.camera, [pinch.a, pinch.b], [a, b]));
   };
 
   const apply = (effects: Effect[]) => {
@@ -380,20 +414,23 @@ export const CanvasStage = ({
     if (!shown || !view) return undefined;
     const members = selected(shown);
     const scale = view.camera().scale;
+    const slop = slopOf(at);
     if (members.length === 1) {
-      const handle = handleAt(members[0], at.image, scale);
+      const handle = handleAt(members[0], at.image, scale, slop);
       return handle ? { start: members, box: null, handle } : undefined;
     }
     if (members.length === 0) return undefined;
     const box = union(members.map(outline));
-    const handle = groupHandleAt(box, at.image, scale);
+    const handle = groupHandleAt(box, at.image, scale, slop);
     return handle ? { start: members, box, handle } : undefined;
   };
 
   const hitAt = (at: PointerAt) => {
     const shown = docRef.current;
     const view = viewRef.current;
-    return shown && view ? hitTest(shown, at.image, view.camera().scale) : null;
+    return shown && view
+      ? hitTest(shown, at.image, view.camera().scale, slopOf(at))
+      : null;
   };
 
   const cursorFor = (at: PointerAt) => {
@@ -418,17 +455,30 @@ export const CanvasStage = ({
       textRef.current?.blur();
       return;
     }
+    if (at.touch) {
+      touchesRef.current.set(event.pointerId, at.screen);
+      if (touchesRef.current.size === 2) {
+        capture(event);
+        startPinch();
+        return;
+      }
+    }
     if (event.button === 1 || (event.button === 0 && spaceRef.current)) {
       event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
+      capture(event);
       panRef.current = at.screen;
       event.currentTarget.style.cursor = "grabbing";
       return;
     }
     if (event.button !== 0) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    capture(event);
     const grab = grabbed(at);
     const hit = grab ? null : hitAt(at);
+    // One finger on empty ground with the select tool pans: a marquee is for a mouse.
+    if (at.touch && !grab && !hit && toolRef.current === "select") {
+      panRef.current = at.screen;
+      return;
+    }
     const [gesture, effects] = press(
       toolRef.current,
       hit,
@@ -443,6 +493,13 @@ export const CanvasStage = ({
   const track = (event: PointerEvent<HTMLCanvasElement>) => {
     const at = pointerAt(event);
     if (!at) return;
+    if (at.touch && touchesRef.current.has(event.pointerId)) {
+      touchesRef.current.set(event.pointerId, at.screen);
+      if (pinchRef.current) {
+        pinchTo();
+        return;
+      }
+    }
     pointerRef.current = at.screen;
     if (imageRef.current) cursor.set(cursorText(at.image));
     const panFrom = panRef.current;
@@ -466,6 +523,12 @@ export const CanvasStage = ({
   };
 
   const up = (event: PointerEvent<HTMLCanvasElement>) => {
+    touchesRef.current.delete(event.pointerId);
+    if (pinchRef.current) {
+      // The pinch ends with its first finger; the other does nothing until it lifts too.
+      if (touchesRef.current.size === 0) pinchRef.current = null;
+      return;
+    }
     if (panRef.current) {
       panRef.current = null;
       event.currentTarget.style.cursor = spaceRef.current ? "grab" : "";
@@ -489,6 +552,8 @@ export const CanvasStage = ({
   };
 
   const cancel = () => {
+    touchesRef.current.clear();
+    pinchRef.current = null;
     panRef.current = null;
     gestureRef.current = IDLE;
     show(IDLE);

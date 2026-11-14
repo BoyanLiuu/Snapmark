@@ -31,10 +31,10 @@ decisions log.
 |                          | M16 — Export, the whole dialog               | ✅ Done |
 |                          | M17 — Out of bounds                          | ✅ Done |
 |                          | M18 — Shortcuts and keyboard                 | ✅ Done |
-|                          | M19 — The phone                              | ⏭ Next  |
+|                          | M19 — The phone                              | ✅ Done |
 
-**Last verified:** 2026-11-14, M18 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
-build); `pnpm test:e2e` 108 passed (54 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M19 — `pnpm check` green (format, typecheck, lint, 62 unit tests,
+build); `pnpm test:e2e` 112 passed (56 checks, each at 2x and 1x).
 
 ---
 
@@ -499,3 +499,22 @@ Commit: `bounds: out-of-bounds gutter and badge`
       "rav" in a label types it. Proven by mutation: without the typing guard, the label check fails
 
 Commit: `keyboard: shortcut map and the shortcuts panel`
+
+## M19 — The phone ✅
+
+- [x] The open page, the editor and the export page fit 375 px; the editor stacks, its inspector
+      and layers below the stage (screens 34–37)
+- [x] Touch: one finger on empty ground pans, two pinch-zoom, and a finger reaches further
+- [x] iOS Safari's lower caps: 16 MP and 4,096 px a side
+- [x] Check (`src/export/limits.test.ts`, `src/geom/camera.test.ts`, `src/geom/hit.test.ts`,
+      `e2e/phone.spec.ts` at 2x and 1x): the caps scale an image to fit; a pinch twice as wide is
+      twice the zoom about the same point; a finger hits 12 px off a frame a mouse misses; on a
+      375 px phone nothing scrolls sideways and the inspector sits below the stage; one finger
+      pans the picture by its drag, and two fingers spread to twice as far apart double the zoom
+
+Worth a look by eye — the whole loop on a real phone:
+
+- [ ] On an iPhone, open an image, draw a box and copy it
+- [ ] A 20 MP photo exports, not blank, and the budget reads 16 MP
+
+Commit: `responsive: phone layouts for library, annotator and export`

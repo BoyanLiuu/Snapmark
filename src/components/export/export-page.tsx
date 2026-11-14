@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { toWebAnnotations } from "@/export/annotations";
 import { downloadBlob } from "@/export/clipboard";
-import { BUDGET_MP, exportSize, readable } from "@/export/limits";
+import { canvasCaps, exportSize, readable } from "@/export/limits";
 import { exportName, renderImage } from "@/export/render";
 import { forced, go, setQuery, type Route } from "@/lib/route";
 import { nbsp, sizeText } from "@/lib/text";
@@ -146,6 +146,7 @@ export const ExportPage = ({
     [file, ready],
   );
 
+  const [{ budgetMP }] = useState(canvasCaps);
   const output = natural ? exportSize(natural) : null;
   const size = output ? sizeText(output) : "–";
   const copying = useCopy(
@@ -195,7 +196,7 @@ export const ExportPage = ({
       : [
           ["Output, px", size],
           ["Pixels", output ? mp(output.w, output.h) : "–"],
-          ["Budget", `${BUDGET_MP} MP`],
+          ["Budget", `${budgetMP} MP`],
         ];
 
   let stage: React.ReactNode;
@@ -367,7 +368,7 @@ export const ExportPage = ({
               >
                 <strong className="font-medium text-foreground">
                   This image is {nbsp(mp(natural.w, natural.h))}, over the{" "}
-                  {nbsp(`${BUDGET_MP} MP`)} budget.
+                  {nbsp(`${budgetMP} MP`)} budget.
                 </strong>{" "}
                 It exports at {size} ({(output.scale * 100).toFixed(1)}%) so the
                 browser never hands back a blank file.

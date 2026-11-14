@@ -75,3 +75,27 @@ export const zoomOf = (cam: Camera, view: Size): Zoom => ({
   scale: cam.scale,
   at: toImage(cam, { x: view.w / 2, y: view.h / 2 }),
 });
+
+/**
+ * Two fingers moved from `from` to `to`: zoomed by how far apart they have moved, at where they
+ * started, and panned with their midpoint.
+ */
+export const pinched = (
+  start: Camera,
+  from: [Point, Point],
+  to: [Point, Point],
+): Camera => {
+  const mid = ([a, b]: [Point, Point]) => ({
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  });
+  const apart = ([a, b]: [Point, Point]) => Math.hypot(b.x - a.x, b.y - a.y);
+  const m0 = mid(from);
+  const m1 = mid(to);
+  const zoomed = zoomAt(start, m0, apart(to) / Math.max(1, apart(from)));
+  return {
+    ...zoomed,
+    tx: zoomed.tx + m1.x - m0.x,
+    ty: zoomed.ty + m1.y - m0.y,
+  };
+};

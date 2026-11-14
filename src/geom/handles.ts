@@ -28,16 +28,21 @@ export const handlesOf = (a: Annotation): [Handle, Point][] => {
 };
 
 /** The handle under `p`, its 8 screen px converted to image px at this zoom. */
-const under = <H>(handles: [H, Point][], p: Point, scale: number): H | null => {
-  const reach = HANDLE_SIZE / 2 / scale;
+const under = <H>(
+  handles: [H, Point][],
+  p: Point,
+  scale: number,
+  slop = 1,
+): H | null => {
+  const reach = ((HANDLE_SIZE / 2) * slop) / scale;
   const found = handles.find(
     ([, c]) => Math.abs(p.x - c.x) <= reach && Math.abs(p.y - c.y) <= reach,
   );
   return found ? found[0] : null;
 };
 
-export const handleAt = (a: Annotation, p: Point, scale: number) =>
-  under(handlesOf(a), p, scale);
+export const handleAt = (a: Annotation, p: Point, scale: number, slop = 1) =>
+  under(handlesOf(a), p, scale, slop);
 
 /** The fields that change when `handle` is dragged to `p`, and the handle the pointer holds now. */
 export const reshape = (
@@ -79,8 +84,8 @@ export const CURSOR: Record<Handle, string> = {
 };
 
 /** A group's handle under `p`: the eight of the box around it (screen 16). */
-export const groupHandleAt = (box: Box, p: Point, scale: number) =>
-  under(boxHandles(box), p, scale);
+export const groupHandleAt = (box: Box, p: Point, scale: number, slop = 1) =>
+  under(boxHandles(box), p, scale, slop);
 
 /** One member of a group, carried from the group's box `from` into `to`. */
 export const scaleInto = (a: Annotation, from: Box, to: Box) => {

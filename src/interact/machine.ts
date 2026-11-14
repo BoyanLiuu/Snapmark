@@ -60,6 +60,8 @@ export interface PointerAt {
   screen: Point;
   /** Adds to the selection; keeps the aspect while resizing from a corner. */
   shift?: boolean;
+  /** A finger: hits and handles reach further. */
+  touch?: boolean;
 }
 
 export type Effect =

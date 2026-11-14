@@ -9,6 +9,8 @@ import type { Annotation, Doc, Id, Point } from "@/model/types";
 import { arrowGeometry } from "./arrow";
 
 const HIT_TOLERANCE = 6;
+/** A finger is less exact than a mouse: tolerances and handle reach grow by this for touch. */
+export const TOUCH_SLOP = 2.5;
 
 const within = (p: Point, b: Box, pad: number) =>
   p.x >= b.x - pad &&
@@ -62,8 +64,13 @@ const hits = (a: Annotation, p: Point, tol: number) => {
 };
 
 /** The topmost annotation at image point `p`, at this zoom (screen px per image px). */
-export const hitTest = (doc: Doc, p: Point, scale: number): Id | null => {
-  const tol = HIT_TOLERANCE / scale;
+export const hitTest = (
+  doc: Doc,
+  p: Point,
+  scale: number,
+  slop = 1,
+): Id | null => {
+  const tol = (HIT_TOLERANCE * slop) / scale;
   const all = annotations(doc);
   for (let i = all.length - 1; i >= 0; i -= 1)
     if (hits(all[i], p, tol)) return all[i].id;

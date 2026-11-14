@@ -6,10 +6,10 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M18 of M0–M19 done. Open an image, zoom to the pixel, draw boxes, arrows,
+**Status:** all of M0–M19 done. Open an image, zoom to the pixel, draw boxes, arrows,
 highlights and labels, pixelate what must not show, select several and reorder layers, undo, then
 Copy a PNG, or export a PNG, a JPEG or the annotations as JSON, at the image's own size and the same
-bytes at any zoom, warned first if anything runs past the edge, all from the keyboard too. The phone is next.
+bytes at any zoom; warned first if anything runs past the edge, by keyboard or on a phone too.
 See [MILESTONES.md](MILESTONES.md).
 
 ## Stack

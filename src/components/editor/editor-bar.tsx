@@ -147,7 +147,7 @@ export const EditorBar = ({
       <div
         role="group"
         aria-label="Zoom"
-        className="ml-auto flex items-center gap-0.5"
+        className="ml-auto flex items-center gap-0.5 max-[40rem]:ml-0 max-[40rem]:w-full max-[40rem]:justify-between"
       >
         <Button
           variant="ghost"
@@ -192,7 +192,7 @@ export const EditorBar = ({
         </Button>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 max-[40rem]:grid max-[40rem]:w-full max-[40rem]:grid-cols-2">
         <Button
           variant="outline"
           size="control"
