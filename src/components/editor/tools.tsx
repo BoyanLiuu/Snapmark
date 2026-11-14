@@ -37,7 +37,6 @@ export const TOOLS: Tool[] = [
     label: "Highlight",
     shortcut: "H",
     icon: Highlighter,
-    from: "M12",
   },
   { id: "text", label: "Text", shortcut: "T", icon: Type, from: "M13" },
   {

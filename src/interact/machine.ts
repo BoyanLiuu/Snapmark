@@ -10,7 +10,12 @@ import type { Annotation, Doc, Id, Point } from "@/model/types";
 export type ToolId =
   "select" | "rect" | "arrow" | "highlight" | "text" | "pixelate";
 
-export type DrawTool = "rect" | "arrow";
+const DRAW_TOOLS = ["rect", "arrow", "highlight"] as const;
+
+export type DrawTool = (typeof DRAW_TOOLS)[number];
+
+export const isDrawTool = (tool: ToolId): tool is DrawTool =>
+  (DRAW_TOOLS as readonly ToolId[]).includes(tool);
 
 /** In screen px, so a click is a click at any zoom. */
 const DRAG_THRESHOLD = 3;
@@ -81,7 +86,7 @@ export const press = (
       [{ kind: "select", id: hit }],
     ];
   const deselect: Effect = { kind: "select", id: null };
-  if (tool === "rect" || tool === "arrow")
+  if (isDrawTool(tool))
     return [
       {
         kind: "drawing",

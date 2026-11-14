@@ -16,6 +16,7 @@ import { toImage } from "@/geom/matrix";
 import { CURSOR, handleAt, handlesOf } from "@/geom/handles";
 import {
   IDLE,
+  isDrawTool,
   move,
   press,
   preview,
@@ -314,8 +315,7 @@ export const CanvasStage = ({
     if (gesture.kind === "drawing") return "crosshair";
     const grab = grabbed(at);
     if (grab) return CURSOR[grab.handle];
-    if (toolRef.current === "rect" || toolRef.current === "arrow")
-      return "crosshair";
+    if (isDrawTool(toolRef.current)) return "crosshair";
     return hitAt(at) ? "move" : "default";
   };
 

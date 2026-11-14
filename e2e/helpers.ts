@@ -112,3 +112,22 @@ export const stored = (page: Page) =>
         };
       }),
   );
+
+/** The base canvas's colour at a point on the page, in CSS px. */
+export const pixelAt = async (page: Page, at: { x: number; y: number }) => {
+  const box = (await page.locator('canvas[data-layer="base"]').boundingBox())!;
+  return page.evaluate(
+    ([x, y]) => {
+      const canvas = document.querySelector<HTMLCanvasElement>(
+        'canvas[data-layer="base"]',
+      )!;
+      const dpr = window.devicePixelRatio;
+      return [
+        ...canvas
+          .getContext("2d")!
+          .getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data,
+      ].slice(0, 3);
+    },
+    [at.x - box.x, at.y - box.y] as const,
+  );
+};

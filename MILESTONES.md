@@ -24,8 +24,8 @@ decisions log.
 | C · Kept and addressable | M9 — The library in this browser             | ✅ Done |
 |                          | M10 — Routes and dead ends                   | ✅ Done |
 | D · The learning goals   | M11 — The camera, zoom does not leak         | ✅ Done |
-|                          | M12 — Highlight and the four-pass compositor | ⏭ Next  |
-|                          | M13 — Text that exports identically          |         |
+|                          | M12 — Highlight and the four-pass compositor | ✅ Done |
+|                          | M13 — Text that exports identically          | ⏭ Next  |
 |                          | M14 — Pixelate, kept live                    |         |
 | E · The whole flow board | M15 — Layers and multi-select                |         |
 |                          | M16 — Export, the whole dialog               |         |
@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M11 — `pnpm check` green (format, typecheck, lint, 52 unit tests,
-build); `pnpm test:e2e` 78 passed (39 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M12 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
+build); `pnpm test:e2e` 80 passed (40 checks, each at 2x and 1x).
 
 ---
 
@@ -386,3 +386,17 @@ Worth a look by eye:
 - [ ] Pinch on a trackpad and two-finger scroll: one zooms at the fingers, the other pans
 
 Commit: `camera: cursor-anchored zoom and pan, with zoom-independence proven`
+
+## M12 — Highlight and the four-pass compositor ✅
+
+- [x] Four passes in `drawScene` since M3: the image, pixelate, highlights (multiply), the rest
+- [x] The highlighter draws a box; red, the default, becomes yellow — `interact/draft.ts`
+- [x] Check (`src/interact/draft.test.ts`, `e2e/highlight.spec.ts` at 2x and 1x): a highlight across
+      an arrow's shaft leaves the shaft's pixel unchanged and multiplies the ground under it.
+      Proven by mutation: drawing highlights in paint order fails it
+
+Worth a look by eye:
+
+- [ ] Highlight a line of text in a screenshot: it stays readable
+
+Commit: `highlight: multiply pass ordered before opaque annotations`

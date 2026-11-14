@@ -13,4 +13,10 @@ describe("drawn", () => {
       h: 200,
     });
   });
+
+  it("a highlight drawn in the default red is a yellow marker", () => {
+    expect(
+      drawn("highlight", { x: 0, y: 0 }, { x: 10, y: 4 }, LOOK, "h"),
+    ).toMatchObject({ kind: "highlight", color: "yellow", w: 10, h: 4 });
+  });
 });
