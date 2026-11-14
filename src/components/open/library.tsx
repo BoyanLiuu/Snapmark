@@ -202,10 +202,23 @@ export const Library = ({
         </ol>
       )}
 
-      <p className="max-w-[48ch] text-sm text-muted-foreground">
-        Each image is filed under the SHA-256 of its bytes, so opening the same
-        file brings its annotations back.
-      </p>
+      <div className="grid max-w-[64ch] gap-2 text-sm text-muted-foreground">
+        <p>
+          Each image is filed under the SHA-256 of its bytes, so opening the
+          same file brings its annotations back, whatever it is called and
+          whichever folder it came from.
+        </p>
+        <p>
+          The picture and its annotations are kept in this browser’s own storage
+          (IndexedDB) on this device, saved as you draw. Nothing is uploaded, so
+          they aren’t on another computer, another browser, or a private window.
+          <strong className="font-normal text-ink-2">
+            {" "}
+            Clearing this site’s data, or Forget, removes them; the file on your
+            computer is never touched.
+          </strong>
+        </p>
+      </div>
 
       <AlertDialog
         open={forgetting !== null}
