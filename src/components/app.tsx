@@ -1,12 +1,50 @@
 "use client";
 
-import { useRef, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import {
+  EMPTY_HISTORY,
+  record,
+  redo,
+  seal,
+  undo,
+  type History,
+} from "@/history/undo";
 import { createDoc } from "@/model/doc";
 import { checkFormat, decodeBitmap, type OpenResult } from "@/model/image";
 import { loadSample, SAMPLE, SAMPLE_DOC } from "@/model/sample";
-import type { Size } from "@/model/types";
-import { EditorShell, type Session } from "./editor/editor-shell";
+import type { Doc, Size } from "@/model/types";
+import { EditorShell, type Editing, type Session } from "./editor/editor-shell";
 import { OpenScreen } from "./open/open-screen";
+
+type Ready = Extract<Session, { state: "ready" }>;
+
+/** Every change goes through here with its history, so an edit and its undo entry never drift. */
+const editingFor = (
+  setSession: Dispatch<SetStateAction<Session | null>>,
+): Editing => {
+  const onReady = (step: (s: Ready) => Ready) =>
+    setSession((s) => (s?.state === "ready" ? step(s) : s));
+  const travel = (s: Ready, done: [History, Doc] | null) =>
+    done ? { ...s, history: done[0], doc: done[1] } : s;
+  return {
+    edit: (fn, label, group) =>
+      onReady((s) => {
+        const doc = fn(s.doc);
+        return doc === s.doc
+          ? s
+          : { ...s, doc, history: record(s.history, s.doc, doc, label, group) };
+      }),
+    seal: () => onReady((s) => ({ ...s, history: seal(s.history) })),
+    undo: () => onReady((s) => travel(s, undo(s.history, s.doc))),
+    redo: () => onReady((s) => travel(s, redo(s.history, s.doc))),
+  };
+};
 
 /**
  * Open an image, then annotate it. A file is checked on the open screen, so one Snapmark can't
@@ -40,7 +78,13 @@ export const App = () => {
         return;
       }
       const doc = sample ? SAMPLE_DOC : createDoc(result.image.natural);
-      setSession({ state: "ready", image: result.image, doc, sample });
+      setSession({
+        state: "ready",
+        image: result.image,
+        doc,
+        history: EMPTY_HISTORY,
+        sample,
+      });
     });
   };
 
@@ -63,14 +107,10 @@ export const App = () => {
     setSession(null);
   };
 
+  const editing = useMemo(() => editingFor(setSession), []);
+
   return session ? (
-    <EditorShell
-      session={session}
-      onDocChange={(doc) =>
-        setSession((s) => (s?.state === "ready" ? { ...s, doc } : s))
-      }
-      onClose={close}
-    />
+    <EditorShell session={session} editing={editing} onClose={close} />
   ) : (
     <OpenScreen refusal={refusal} onFile={openFile} onSample={openSample} />
   );

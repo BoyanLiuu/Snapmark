@@ -15,6 +15,11 @@ export interface EditorBarProps {
   zoom: number | null;
   tool: ToolId;
   onToolChange: (tool: ToolId) => void;
+  /** What undo and redo would step over; null when there is nothing to step. */
+  undoLabel: string | null;
+  redoLabel: string | null;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 /**
@@ -27,6 +32,10 @@ export const EditorBar = ({
   zoom,
   tool,
   onToolChange,
+  undoLabel,
+  redoLabel,
+  onUndo,
+  onRedo,
 }: EditorBarProps) => {
   const size = natural ? `${natural.w} × ${natural.h}` : "";
   return (
@@ -76,8 +85,13 @@ export const EditorBar = ({
           variant="ghost"
           size="icon-control"
           aria-label="Undo"
-          title="Undo (⌘Z)"
-          disabled
+          title={
+            undoLabel
+              ? `Undo ${undoLabel.toLowerCase()} (⌘Z)`
+              : "Nothing to undo"
+          }
+          disabled={!undoLabel}
+          onClick={onUndo}
         >
           <Undo2 />
         </Button>
@@ -85,8 +99,13 @@ export const EditorBar = ({
           variant="ghost"
           size="icon-control"
           aria-label="Redo"
-          title="Redo (⇧⌘Z)"
-          disabled
+          title={
+            redoLabel
+              ? `Redo ${redoLabel.toLowerCase()} (⇧⌘Z)`
+              : "Nothing to redo"
+          }
+          disabled={!redoLabel}
+          onClick={onRedo}
         >
           <Redo2 />
         </Button>

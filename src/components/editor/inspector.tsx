@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { arrowLength } from "@/geom/arrow";
 import { outline } from "@/model/bbox";
 import { KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
@@ -44,6 +45,7 @@ const RangeField = ({
   unit,
   help,
   onChange,
+  onCommit,
 }: {
   id: string;
   label: string;
@@ -53,6 +55,7 @@ const RangeField = ({
   unit: string;
   help?: string;
   onChange: (value: number) => void;
+  onCommit: () => void;
 }) => (
   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
     <span id={`${id}-label`} className={`col-span-full ${labelClass}`}>
@@ -67,6 +70,7 @@ const RangeField = ({
       step={1}
       value={[value]}
       onValueChange={([next]) => onChange(next)}
+      onValueCommit={onCommit}
     />
     <output className="min-w-[6ch] text-right font-mono text-sm text-foreground tabular-nums">
       {value}
@@ -82,6 +86,29 @@ const RangeField = ({
     )}
   </div>
 );
+
+const r = Math.round;
+
+/** Where a selected annotation is, in image px, in rows: an arrow by its ends (screen 20), else its box. */
+const factsOf = (a: Annotation): [string, string][][] => {
+  if (a.kind === "arrow")
+    return [
+      [
+        ["From", `${r(a.x1)}, ${r(a.y1)}`],
+        ["To", `${r(a.x2)}, ${r(a.y2)}`],
+      ],
+      [["Length", String(r(arrowLength(a)))]],
+    ];
+  const box = outline(a);
+  return [
+    [
+      ["X", String(r(box.x))],
+      ["Y", String(r(box.y))],
+      ["W", String(r(box.w))],
+      ["H", String(r(box.h))],
+    ],
+  ];
+};
 
 /** The look a new annotation is drawn with, and what the inspector edits on a selected one. */
 export interface Style {
@@ -101,18 +128,21 @@ export const Inspector = ({
   subject,
   style,
   onChange,
+  onCommit,
   onDelete,
 }: {
   subject: { naturalWidth: number } | { selected: Annotation };
   style: Style;
+  /** A slider drag calls this many times and `onCommit` once, when it lets go. */
   onChange: (patch: Partial<Style>) => void;
+  onCommit: () => void;
   onDelete: () => void;
 }) => {
   const selected = "selected" in subject ? subject.selected : null;
   const kind = selected?.kind;
   const hasColour = kind !== "pixelate";
   const hasStroke = !kind || kind === "rect" || kind === "arrow";
-  const box = selected ? outline(selected) : null;
+  const facts = selected ? factsOf(selected) : null;
 
   return (
     <section
@@ -167,6 +197,7 @@ export const Inspector = ({
               : undefined
           }
           onChange={(strokeWidth) => onChange({ strokeWidth })}
+          onCommit={onCommit}
         />
       )}
       <RangeField
@@ -177,33 +208,32 @@ export const Inspector = ({
         max={100}
         unit="%"
         onChange={(percent) => onChange({ opacity: percent / 100 })}
+        onCommit={onCommit}
       />
 
-      {box && (
+      {facts && (
         <>
-          <dl className="grid grid-cols-4 border-t border-rule-2 pt-3">
-            {(
-              [
-                ["X", box.x],
-                ["Y", box.y],
-                ["W", box.w],
-                ["H", box.h],
-              ] as const
-            ).map(([label, value]) => (
-              <div
-                key={label}
-                className="grid gap-1 border-r border-rule-2 px-2 first:pl-0 last:border-r-0"
-              >
-                <dt className="text-xs text-muted-foreground">{label}</dt>
-                <dd
-                  data-testid={`box-${label.toLowerCase()}`}
-                  className="font-mono text-sm text-foreground tabular-nums"
+          {facts.map((row) => (
+            <dl
+              key={row[0][0]}
+              className={`grid border-t border-rule-2 pt-3 ${row.length === 4 ? "grid-cols-4" : "grid-cols-2"}`}
+            >
+              {row.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="grid gap-1 border-r border-rule-2 px-2 first:pl-0 last:border-r-0"
                 >
-                  {Math.round(value)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd
+                    data-testid={`fact-${label.toLowerCase()}`}
+                    className="font-mono text-sm whitespace-nowrap text-foreground tabular-nums"
+                  >
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ))}
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"

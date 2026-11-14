@@ -4,7 +4,7 @@
  */
 
 import { toScreen } from "@/geom/matrix";
-import { HANDLE_SIZE, HANDLES, handlePoint } from "@/geom/resize";
+import { HANDLE_SIZE } from "@/geom/handles";
 import type { Box } from "@/model/bbox";
 import type { Point } from "@/model/types";
 import type { Frame } from "./view";
@@ -62,42 +62,49 @@ export const drawMark = (
   ctx.stroke();
 };
 
-/** The selection (screen 13): outline, handles where it can be resized, and its size on a tag. */
+/**
+ * The selection (screens 13, 20): an outline round a box (none round an arrow, whose line is its
+ * own outline), its handles, and its size on a tag below.
+ */
 export const drawSelection = (
   ctx: CanvasRenderingContext2D,
   { camera, size }: Frame,
-  box: Box,
-  tag: string,
-  handles: boolean,
+  { box, handles, tag }: { box: Box | null; handles: Point[]; tag: string },
 ) => {
-  const snap = (p: { x: number; y: number }) => {
+  const snap = (p: Point) => {
     const s = toScreen(camera, p);
     return { x: hairline(s.x, size.dpr), y: hairline(s.y, size.dpr) };
   };
-  const a = snap({ x: box.x, y: box.y });
-  const b = snap({ x: box.x + box.w, y: box.y + box.h });
-
+  const points = handles.map((p) => toScreen(camera, p));
   ctx.strokeStyle = ACCENT;
-  ctx.lineWidth = 1 / size.dpr;
-  ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
 
-  if (handles) {
-    ctx.fillStyle = PAPER;
-    ctx.lineWidth = 1;
-    for (const h of HANDLES) {
-      const c = toScreen(camera, handlePoint(box, h));
-      const left = Math.round(c.x - HANDLE_SIZE / 2);
-      const top = Math.round(c.y - HANDLE_SIZE / 2);
-      ctx.fillRect(left, top, HANDLE_SIZE, HANDLE_SIZE);
-      ctx.strokeRect(left + 0.5, top + 0.5, HANDLE_SIZE - 1, HANDLE_SIZE - 1);
-    }
+  let mid: number;
+  let bottom: number;
+  if (box) {
+    const a = snap({ x: box.x, y: box.y });
+    const b = snap({ x: box.x + box.w, y: box.y + box.h });
+    ctx.lineWidth = 1 / size.dpr;
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    mid = (a.x + b.x) / 2;
+    bottom = b.y;
+  } else {
+    mid = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    bottom = Math.max(...points.map((p) => p.y));
+  }
+
+  ctx.fillStyle = PAPER;
+  ctx.lineWidth = 1;
+  for (const c of points) {
+    const left = Math.round(c.x - HANDLE_SIZE / 2);
+    const top = Math.round(c.y - HANDLE_SIZE / 2);
+    ctx.fillRect(left, top, HANDLE_SIZE, HANDLE_SIZE);
+    ctx.strokeRect(left + 0.5, top + 0.5, HANDLE_SIZE - 1, HANDLE_SIZE - 1);
   }
 
   ctx.font = TAG_FONT;
-  const mid = (a.x + b.x) / 2;
   const w = Math.ceil(ctx.measureText(tag).width) + 12;
   const h = 20;
-  const top = Math.round(b.y + HANDLE_SIZE);
+  const top = Math.round(bottom + HANDLE_SIZE);
   ctx.fillStyle = ACCENT;
   ctx.fillRect(Math.round(mid - w / 2), top, w, h);
   ctx.fillStyle = ACCENT_INK;

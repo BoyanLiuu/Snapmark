@@ -7,9 +7,9 @@
 import type { Box } from "@/model/bbox";
 import type { Point } from "@/model/types";
 
-export type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+export type BoxHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
-export const HANDLES: readonly Handle[] = [
+export const HANDLES: readonly BoxHandle[] = [
   "nw",
   "n",
   "ne",
@@ -20,10 +20,7 @@ export const HANDLES: readonly Handle[] = [
   "w",
 ];
 
-/** Screen px at any zoom. */
-export const HANDLE_SIZE = 8;
-
-export const handlePoint = (box: Box, handle: Handle): Point => ({
+export const handlePoint = (box: Box, handle: BoxHandle): Point => ({
   x: handle.includes("w")
     ? box.x
     : handle.includes("e")
@@ -36,17 +33,6 @@ export const handlePoint = (box: Box, handle: Handle): Point => ({
       : box.y + box.h / 2,
 });
 
-/** The handle at image point `p`, its 8 screen px converted to image px at this zoom. */
-export const handleAt = (box: Box, p: Point, scale: number): Handle | null => {
-  const reach = HANDLE_SIZE / 2 / scale;
-  return (
-    HANDLES.find((h) => {
-      const c = handlePoint(box, h);
-      return Math.abs(p.x - c.x) <= reach && Math.abs(p.y - c.y) <= reach;
-    }) ?? null
-  );
-};
-
 const sign = (v: number, fallback: number) =>
   v === 0 ? fallback : Math.sign(v);
 
@@ -56,10 +42,10 @@ const sign = (v: number, fallback: number) =>
  */
 export const resize = (
   start: Box,
-  handle: Handle,
+  handle: BoxHandle,
   p: Point,
   keepAspect = false,
-): { box: Box; handle: Handle } => {
+): { box: Box; handle: BoxHandle } => {
   const horizontal = handle.includes("w") || handle.includes("e");
   const vertical = handle.includes("n") || handle.includes("s");
   const anchor = {
@@ -74,7 +60,7 @@ export const resize = (
     dy = sign(dy, handle.includes("n") ? -1 : 1) * s * start.h;
   }
   const live =
-    `${vertical ? (dy < 0 ? "n" : "s") : ""}${horizontal ? (dx < 0 ? "w" : "e") : ""}` as Handle;
+    `${vertical ? (dy < 0 ? "n" : "s") : ""}${horizontal ? (dx < 0 ? "w" : "e") : ""}` as BoxHandle;
   return {
     box: {
       x: Math.min(anchor.x, anchor.x + dx),
@@ -84,15 +70,4 @@ export const resize = (
     },
     handle: live,
   };
-};
-
-export const CURSOR: Record<Handle, string> = {
-  nw: "nwse-resize",
-  se: "nwse-resize",
-  ne: "nesw-resize",
-  sw: "nesw-resize",
-  n: "ns-resize",
-  s: "ns-resize",
-  e: "ew-resize",
-  w: "ew-resize",
 };

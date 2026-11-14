@@ -3,84 +3,75 @@
  * applies the effects it returns. The document changes once, when a gesture ends.
  */
 
-import { resize, type Handle } from "@/geom/resize";
-import type { Box } from "@/model/bbox";
+import { reshape, type Handle } from "@/geom/handles";
 import { translated, withAnnotation } from "@/model/doc";
 import type { Annotation, Doc, Id, Point } from "@/model/types";
 
 export type ToolId =
   "select" | "rect" | "arrow" | "highlight" | "text" | "pixelate";
 
+export type DrawTool = "rect" | "arrow";
+
 /** In screen px, so a click is a click at any zoom. */
 const DRAG_THRESHOLD = 3;
 
 export type Gesture =
   | { kind: "idle" }
-  /** Down on an annotation, not yet moved past the threshold: still a click. */
+  /** Down on an annotation, not yet past the threshold: still a click. */
   | { kind: "pressing"; id: Id; from: Point; fromScreen: Point }
   | { kind: "moving"; id: Id; from: Point; to: Point }
   | {
-      kind: "resizing";
-      id: Id;
-      start: Box;
-      grabbed: Handle;
-      box: Box;
-      /** The handle the pointer holds now: the mirror of the grabbed one past a flip. */
-      handle: Handle;
-      fromScreen: Point;
-      dragged: boolean;
-    }
-  | {
       kind: "drawing";
+      tool: DrawTool;
       from: Point;
       to: Point;
       fromScreen: Point;
       dragged: boolean;
+    }
+  | {
+      kind: "reshaping";
+      start: Annotation;
+      grabbed: Handle;
+      /** The handle the pointer holds now: the mirror of the grabbed one past a flip. */
+      handle: Handle;
+      patch: Partial<Annotation> | null;
+      fromScreen: Point;
     };
 
 export interface PointerAt {
   image: Point;
   screen: Point;
-  /** Shift: keep the aspect while resizing from a corner. */
+  /** Keep the aspect while resizing from a corner. */
   shift?: boolean;
 }
 
 export type Effect =
   | { kind: "select"; id: Id | null }
-  | { kind: "draw"; box: Box }
+  | { kind: "draw"; tool: DrawTool; from: Point; to: Point }
   | { kind: "move"; id: Id; dx: number; dy: number }
-  | { kind: "resize"; id: Id; box: Box };
+  | { kind: "reshape"; id: Id; patch: Partial<Annotation> };
 
 export const IDLE: Gesture = { kind: "idle" };
 
 const beyond = (a: Point, b: Point) =>
   Math.hypot(a.x - b.x, a.y - b.y) > DRAG_THRESHOLD;
 
-const boxBetween = (a: Point, b: Point): Box => ({
-  x: Math.min(a.x, b.x),
-  y: Math.min(a.y, b.y),
-  w: Math.abs(b.x - a.x),
-  h: Math.abs(b.y - a.y),
-});
-
 /** A handle of the selection wins, then an annotation under the pointer, then drawing. */
 export const press = (
   tool: ToolId,
   hit: Id | null,
   at: PointerAt,
-  grab?: { id: Id; handle: Handle; box: Box },
+  grab?: { annotation: Annotation; handle: Handle },
 ): [Gesture, Effect[]] => {
   if (grab)
     return [
       {
-        kind: "resizing",
-        id: grab.id,
-        start: grab.box,
+        kind: "reshaping",
+        start: grab.annotation,
         grabbed: grab.handle,
-        box: grab.box,
         handle: grab.handle,
+        patch: null,
         fromScreen: at.screen,
-        dragged: false,
       },
       [],
     ];
@@ -90,10 +81,11 @@ export const press = (
       [{ kind: "select", id: hit }],
     ];
   const deselect: Effect = { kind: "select", id: null };
-  if (tool === "rect")
+  if (tool === "rect" || tool === "arrow")
     return [
       {
         kind: "drawing",
+        tool,
         from: at.image,
         to: at.image,
         fromScreen: at.screen,
@@ -116,14 +108,10 @@ export const move = (g: Gesture, at: PointerAt): Gesture => {
       to: at.image,
       dragged: g.dragged || beyond(at.screen, g.fromScreen),
     };
-  if (g.kind === "resizing") {
-    const { box, handle } = resize(g.start, g.grabbed, at.image, at.shift);
-    return {
-      ...g,
-      box,
-      handle,
-      dragged: g.dragged || beyond(at.screen, g.fromScreen),
-    };
+  if (g.kind === "reshaping") {
+    if (!g.patch && !beyond(at.screen, g.fromScreen)) return g;
+    const { patch, handle } = reshape(g.start, g.grabbed, at.image, at.shift);
+    return { ...g, patch, handle };
   }
   return g;
 };
@@ -140,9 +128,9 @@ export const release = (g: Gesture, at: PointerAt): Effect[] => {
       },
     ];
   if (end.kind === "drawing" && end.dragged)
-    return [{ kind: "draw", box: boxBetween(end.from, end.to) }];
-  if (end.kind === "resizing" && end.dragged)
-    return [{ kind: "resize", id: end.id, box: end.box }];
+    return [{ kind: "draw", tool: end.tool, from: end.from, to: end.to }];
+  if (end.kind === "reshaping" && end.patch)
+    return [{ kind: "reshape", id: end.start.id, patch: end.patch }];
   return [];
 };
 
@@ -150,7 +138,7 @@ export const release = (g: Gesture, at: PointerAt): Effect[] => {
 export const preview = (
   g: Gesture,
   doc: Doc,
-  draft: (box: Box) => Annotation,
+  draft: (tool: DrawTool, from: Point, to: Point) => Annotation,
 ): Doc | null => {
   if (g.kind === "moving") {
     const a = doc.byId.get(g.id);
@@ -159,10 +147,8 @@ export const preview = (
       : null;
   }
   if (g.kind === "drawing" && g.dragged)
-    return withAnnotation(doc, draft(boxBetween(g.from, g.to)));
-  if (g.kind === "resizing" && g.dragged) {
-    const a = doc.byId.get(g.id);
-    return a ? withAnnotation(doc, { ...a, ...g.box } as Annotation) : null;
-  }
+    return withAnnotation(doc, draft(g.tool, g.from, g.to));
+  if (g.kind === "reshaping" && g.patch)
+    return withAnnotation(doc, { ...g.start, ...g.patch } as Annotation);
   return null;
 };

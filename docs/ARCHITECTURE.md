@@ -447,23 +447,23 @@ The 3 px threshold is in **CSS px**, not image px: at 400% zoom a 3-image-px thr
 
 During `dragging` / `resizing` / `drawing`, the model is **not** touched — the operation's result is rendered on the overlay and committed once on pointer-up. Here the reason is not network traffic (project 11's reason) but **undo granularity**: a drag that wrote on every pointer-move would produce 300 undo entries and ⌘Z would appear broken.
 
-Undo is a bounded command stack of inverse property patches, capped at 100 entries:
+Undo is a bounded stack of operations, capped at 100 entries. Each entry holds only what one change touched:
 
 ```ts
-type Patch = {
+type Change = {
   id: Id;
-  before: Partial<Annotation>;
-  after: Partial<Annotation>;
+  before: Annotation | undefined; // undefined: the change added it
+  after: Annotation | undefined; // undefined: the change removed it
 };
 type Entry = {
-  label: string;
-  patches: Patch[];
-  addedIds?: Id[];
-  removedIds?: Id[];
+  label: string; // "Draw", "Move", "Resize", "Restyle", "Delete"
+  changes: Change[];
+  order: { before: Id[]; after: Id[] } | null; // only when the paint order moved
+  group: string | null; // a slider drag merges into one entry until it is let go
 };
 ```
 
-Property patches rather than document snapshots, because a snapshot of a doc holding a 2000-point pen stroke, ×100 entries, is tens of megabytes of retained memory.
+The changed annotations rather than document snapshots, because a snapshot of every annotation ×100 entries is retained memory that grows with the document. Each of Snapmark's kinds is a few numbers and at most a string, so an entry keeps the touched annotations whole rather than diffing their properties.
 
 ## 10. Project layout
 
@@ -496,7 +496,7 @@ src/
     tools/{select,rect,ellipse,arrow,highlight,pen,text,pixelate}.ts
     text-overlay.ts   # the positioned <textarea>
   history/
-    undo.ts           # inverse-patch command stack, 100 entries
+    undo.ts           # undo by operation: what each change touched, 100 entries
   components/         # §10's `ui/` in the Next.js build
     ui/               # shadcn primitives (button, …)
     editor/           # canvas-stage.tsx, then toolbar, inspector, layer-list, export-dialog, zoom-bar, dropzone

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { rect } from "@/test/shapes";
 import { move, press, release } from "./machine";
 
 /** An image point and the screen point it shows at, here at 25% with no pan. */
@@ -30,10 +31,15 @@ describe("the interaction machine", () => {
     expect(release(down, at(404, 400))).toEqual([]);
   });
 
-  it("a box drawn up and to the left still has a positive size", () => {
-    const [down] = press("rect", null, at(800, 600));
+  it("a drag with the arrow draws from where it started to where it ended", () => {
+    const [down] = press("arrow", null, at(800, 600));
     expect(release(move(down, at(400, 400)), at(400, 400))).toEqual([
-      { kind: "draw", box: { x: 400, y: 400, w: 400, h: 200 } },
+      {
+        kind: "draw",
+        tool: "arrow",
+        from: { x: 800, y: 600 },
+        to: { x: 400, y: 400 },
+      },
     ]);
   });
 
@@ -41,17 +47,16 @@ describe("the interaction machine", () => {
     expect(press("rect", "a", at(400, 400))[0].kind).toBe("pressing");
   });
 
-  it("dragging a handle resizes once, on release; a click on a handle changes nothing", () => {
-    const grab = {
-      id: "a",
-      handle: "se" as const,
-      box: { x: 400, y: 400, w: 400, h: 200 },
-    };
-    const [down, effects] = press("select", "a", at(800, 600), grab);
+  it("dragging a handle reshapes once, on release; a click on a handle changes nothing", () => {
+    const box = rect("a", { x: 400, y: 400, w: 400, h: 200 });
+    const [down, effects] = press("select", "a", at(800, 600), {
+      annotation: box,
+      handle: "se",
+    });
     expect(effects).toEqual([]);
     expect(release(down, at(804, 600))).toEqual([]);
     expect(release(move(down, at(1000, 700)), at(1000, 700))).toEqual([
-      { kind: "resize", id: "a", box: { x: 400, y: 400, w: 600, h: 300 } },
+      { kind: "reshape", id: "a", patch: { x: 400, y: 400, w: 600, h: 300 } },
     ]);
   });
 });

@@ -11,22 +11,24 @@ import { Button } from "@/components/ui/button";
 import { fit } from "@/geom/camera";
 import { hitTest } from "@/geom/hit";
 import { toImage } from "@/geom/matrix";
-import { CURSOR, handleAt } from "@/geom/resize";
+import { CURSOR, handleAt, handlesOf } from "@/geom/handles";
 import {
   IDLE,
   move,
   press,
   preview,
   release,
+  type DrawTool,
   type Effect,
   type Gesture,
   type PointerAt,
   type ToolId,
 } from "@/interact/machine";
 import { createStore, type Store } from "@/lib/store";
+import { isTyping } from "@/lib/typing";
 import { useRefValue } from "@/lib/use-ref-value";
-import { outline, type Box } from "@/model/bbox";
-import { dimsOf } from "@/model/describe";
+import { outline } from "@/model/bbox";
+import { tagOf } from "@/model/describe";
 import type { LoadedImage } from "@/model/image";
 import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
@@ -100,20 +102,11 @@ const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
   </div>
 );
 
-/** Shapes with a box to drag by its handles. Arrows get end handles in M7, text a width in M13. */
-const resizable = (a: Annotation) =>
-  a.kind === "rect" || a.kind === "highlight" || a.kind === "pixelate";
-
-const typing = (target: EventTarget | null) =>
-  target instanceof HTMLInputElement ||
-  target instanceof HTMLTextAreaElement ||
-  (target instanceof HTMLElement && target.isContentEditable);
-
 export interface StageActions {
   onSelect: (id: Id | null) => void;
-  onDraw: (box: Box) => void;
+  onDraw: (tool: DrawTool, from: Point, to: Point) => void;
   onMove: (id: Id, dx: number, dy: number) => void;
-  onResize: (id: Id, box: Box) => void;
+  onReshape: (id: Id, patch: Partial<Annotation>) => void;
   onDelete: () => void;
   onDrawBox: () => void;
 }
@@ -141,7 +134,7 @@ export const CanvasStage = ({
   decoding: { name: string; natural: Size | null } | null;
   tool: ToolId;
   selected: Id | null;
-  draft: (box: Box) => Annotation;
+  draft: (tool: DrawTool, from: Point, to: Point) => Annotation;
   actions: StageActions;
   onZoomChange?: (scale: number) => void;
 }) => {
@@ -191,7 +184,12 @@ export const CanvasStage = ({
         const id = selectedRef.current;
         const a =
           id && shown?.order.includes(id) ? shown.byId.get(id) : undefined;
-        if (a) drawSelection(ctx, frame, outline(a), dimsOf(a), resizable(a));
+        if (a)
+          drawSelection(ctx, frame, {
+            box: a.kind === "arrow" ? null : outline(a),
+            handles: handlesOf(a).map(([, p]) => p),
+            tag: tagOf(a),
+          });
       },
       // React only hears about frames when the debug readout is showing.
       onFrame: (next) => {
@@ -254,8 +252,10 @@ export const CanvasStage = ({
     const act = actionsRef.current;
     for (const effect of effects) {
       if (effect.kind === "select") act.onSelect(effect.id);
-      else if (effect.kind === "draw") act.onDraw(effect.box);
-      else if (effect.kind === "resize") act.onResize(effect.id, effect.box);
+      else if (effect.kind === "draw")
+        act.onDraw(effect.tool, effect.from, effect.to);
+      else if (effect.kind === "reshape")
+        act.onReshape(effect.id, effect.patch);
       else act.onMove(effect.id, effect.dx, effect.dy);
     }
   };
@@ -273,10 +273,9 @@ export const CanvasStage = ({
     const id = selectedRef.current;
     const a = id ? docRef.current?.byId.get(id) : undefined;
     const view = viewRef.current;
-    if (!a || !view || !resizable(a)) return undefined;
-    const box = outline(a);
-    const handle = handleAt(box, at.image, view.camera().scale);
-    return handle ? { id: a.id, handle, box } : undefined;
+    if (!a || !view) return undefined;
+    const handle = handleAt(a, at.image, view.camera().scale);
+    return handle ? { annotation: a, handle } : undefined;
   };
 
   const hitAt = (at: PointerAt) => {
@@ -287,12 +286,13 @@ export const CanvasStage = ({
 
   const cursorFor = (at: PointerAt) => {
     const gesture = gestureRef.current;
-    if (gesture.kind === "resizing") return CURSOR[gesture.handle];
+    if (gesture.kind === "reshaping") return CURSOR[gesture.handle];
     if (gesture.kind === "moving") return "grabbing";
     if (gesture.kind === "drawing") return "crosshair";
     const grab = grabbed(at);
     if (grab) return CURSOR[grab.handle];
-    if (toolRef.current === "rect") return "crosshair";
+    if (toolRef.current === "rect" || toolRef.current === "arrow")
+      return "crosshair";
     return hitAt(at) ? "move" : "default";
   };
 
@@ -348,7 +348,7 @@ export const CanvasStage = ({
   // Esc drops a gesture in progress, or else the selection; Delete and Backspace remove it.
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (typing(event.target)) return;
+      if (isTyping(event.target)) return;
       if (event.key === "Escape") {
         if (gestureRef.current.kind !== "idle") cancel();
         else actionsRef.current.onSelect(null);

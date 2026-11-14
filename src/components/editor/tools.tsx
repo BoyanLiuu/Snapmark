@@ -31,13 +31,7 @@ export const TOOLS: Tool[] = [
     icon: MousePointer2,
   },
   { id: "rect", label: "Rectangle", shortcut: "R", icon: Square },
-  {
-    id: "arrow",
-    label: "Arrow",
-    shortcut: "A",
-    icon: ArrowUpRight,
-    from: "M7",
-  },
+  { id: "arrow", label: "Arrow", shortcut: "A", icon: ArrowUpRight },
   {
     id: "highlight",
     label: "Highlight",

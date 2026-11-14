@@ -3,6 +3,7 @@
  * the size tag. Text by its words, shapes by colour and kind, sizes in image px.
  */
 
+import { arrowLength } from "@/geom/arrow";
 import { swatch } from "./palette";
 import type { Annotation } from "./types";
 
@@ -28,3 +29,7 @@ export const dimsOf = (a: Annotation) => {
     return size(Math.abs(a.x2 - a.x1), Math.abs(a.y2 - a.y1));
   return size(a.w, a.h);
 };
+
+/** The selection's size tag: an arrow by its length, everything else by its size. */
+export const tagOf = (a: Annotation) =>
+  a.kind === "arrow" ? `${Math.round(arrowLength(a))} px` : dimsOf(a);

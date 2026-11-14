@@ -14,13 +14,13 @@ decisions log.
 | ------------------------ | -------------------------------------------- | ------- |
 | A · Foundation           | M0 — A crisp canvas and a render loop        | ✅ Done |
 |                          | M1 — The editor shell, laid out              | ✅ Done |
-|                          | M2 — The coordinate chain · **gate**         | ⏭ Next  |
-| B · The paste loop       | M3 — Open an image                           |         |
-|                          | M4 — The annotator states                    |         |
-|                          | M5 — Rectangle, model, selection             |         |
-|                          | M6 — Resize handles                          |         |
-|                          | M7 — Arrow, inspector, undo                  |         |
-|                          | M8 — Export and Copy · **MVP**               |         |
+|                          | M2 — The coordinate chain · **gate**         | ✅ Done |
+| B · The paste loop       | M3 — Open an image                           | ✅ Done |
+|                          | M4 — The annotator states                    | ✅ Done |
+|                          | M5 — Rectangle, model, selection             | ✅ Done |
+|                          | M6 — Resize handles                          | ✅ Done |
+|                          | M7 — Arrow, inspector, undo                  | ✅ Done |
+|                          | M8 — Export and Copy · **MVP**               | ⏭ Next  |
 | C · Kept and addressable | M9 — The library in this browser             |         |
 |                          | M10 — Routes and dead ends                   |         |
 | D · The learning goals   | M11 — The camera, zoom does not leak         |         |
@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M6 — `pnpm check` green (format, typecheck, lint, 37 unit tests,
-build); `pnpm test:e2e` 40 passed (20 checks, each at 2x and 1x).
+**Last verified:** 2026-11-13, M7 — `pnpm check` green (format, typecheck, lint, 47 unit tests,
+build); `pnpm test:e2e` 44 passed (22 checks, each at 2x and 1x).
 
 ---
 
@@ -259,3 +259,27 @@ Commit: `rect: annotation model, hit testing and the interaction state machine`
       past the opposite one flips the box, in image px
 
 Commit: `resize: eight handles with flip and shift-aspect`
+
+## M7 — Arrow, inspector, undo ✅
+
+- [x] The arrow tool: drag from tail to tip; the head is sized along the shaft and clamped against
+      its length, the shaft shortened to meet it — `geom/arrow.ts`; shorter than two strokes is
+      discarded on release
+- [x] Arrow selection: a handle at each end, the length on the tag, From, To and Length in the
+      inspector (screen 20) — `geom/handles.ts`, `render/overlay.ts`, `inspector.tsx`
+- [x] The inspector's colour, stroke and opacity edit the selected shape, each an undo step
+- [x] Undo by operation, 100 entries: a gesture is one entry, a slider drag is one; ⌘Z and ⇧⌘Z,
+      and the Undo and Redo buttons, which name what they step — `history/undo.ts`, `app.tsx`
+- [x] Check: arrowheads at 3, 40 and 2000 px finite and in bounds, a 30 px arrow at 11 px stroke is
+      half head, the head symmetric at any angle, an arrow's tip handle moves only its tip; undo and redo of add, move, delete and a merged
+      slider group; in the browser an arrow from B to A recorded by its ends in image px, and
+      draw, move and a slider drag undone one step each, then redone. Proven by mutation: it fails
+      when a slider drag isn't grouped, and when a move isn't recorded
+- [x] The M5 move check now drags the frame, not the corner (a handle since M6), and checks the
+      width is unchanged
+
+Worth a look by eye:
+
+- [ ] Hold ⌘Z after a few drags and watch it step back one drag at a time
+
+Commit: `arrow: shaft geometry, inspector controls and undo by operation`

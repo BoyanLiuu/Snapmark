@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { degenerate } from "@/geom/arrow";
+import type { History } from "@/history/undo";
+import { drawn } from "@/interact/draft";
+import type { DrawTool } from "@/interact/machine";
 import { toggle } from "@/lib/set";
-import type { Box } from "@/model/bbox";
+import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
   removeAnnotations,
@@ -11,7 +15,7 @@ import {
   withoutIds,
 } from "@/model/doc";
 import type { LoadedImage } from "@/model/image";
-import type { Annotation, Doc, Id, Size } from "@/model/types";
+import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
 import { SampleNotice } from "../open/sample-notice";
 import { AppBar } from "./app-bar";
 import { CanvasStage, type StageActions } from "./canvas-stage";
@@ -23,7 +27,7 @@ import { layerRows } from "./layers";
 import { statusLine } from "./status";
 import type { ToolId } from "./tools";
 
-/** An open image: decoding (screen 08), or ready with its document. */
+/** An open image: decoding (screen 08), or ready with its document and its history. */
 export type Session =
   | {
       state: "decoding";
@@ -32,13 +36,26 @@ export type Session =
       natural: Size | null;
       sample: boolean;
     }
-  | { state: "ready"; image: LoadedImage; doc: Doc; sample: boolean };
+  | {
+      state: "ready";
+      image: LoadedImage;
+      doc: Doc;
+      history: History;
+      sample: boolean;
+    };
+
+export interface Editing {
+  /** One change, one undo entry; a `group` merges a run of changes (a slider drag) into one. */
+  edit: (fn: (doc: Doc) => Doc, label: string, group?: string) => void;
+  seal: () => void;
+  undo: () => void;
+  redo: () => void;
+}
 
 const NONE: ReadonlySet<Id> = new Set();
 
 const newId = () => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
 
-/** The look-related fields an annotation has, for the inspector. */
 const styleOf = (a: Annotation): Style => ({
   color: a.color,
   strokeWidth: a.strokeWidth,
@@ -47,18 +64,15 @@ const styleOf = (a: Annotation): Style => ({
 
 /**
  * Screen 09: app bar, editor bar, the stage with its status strip, and the rail with the
- * inspector above the layers. While the image decodes the stage and the layers say so (08); an
- * image with nothing on it offers a first box (10). The rectangle draws and anything selects,
- * moves and deletes (12, 13).
+ * inspector above the layers, through every state from decoding (08) to a shape selected (13, 20).
  */
 export const EditorShell = ({
   session,
-  onDocChange,
+  editing,
   onClose,
 }: {
   session: Session;
-  /** Every change to the document goes up from here: one per gesture. */
-  onDocChange: (doc: Doc) => void;
+  editing: Editing;
   onClose: () => void;
 }) => {
   const [tool, setTool] = useState<ToolId>("select");
@@ -66,7 +80,7 @@ export const EditorShell = ({
   const [hidden, setHidden] = useState<ReadonlySet<Id>>(NONE);
   const [selectedId, setSelectedId] = useState<Id | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  // The next annotation's look; the stroke follows the image's width until it is set by hand.
+  // The stroke follows the image's width until it is set by hand.
   const [defaults, setDefaults] = useState<
     Omit<Style, "strokeWidth"> & { strokeWidth: number | null }
   >({
@@ -89,37 +103,34 @@ export const EditorShell = ({
     ...defaults,
     strokeWidth: defaults.strokeWidth ?? defaultStroke(natural?.w ?? 0),
   };
+  const history = ready?.history;
 
-  const draft = (box: Box): Annotation => ({
-    id: "draft",
-    kind: "rect",
-    ...style,
-    ...box,
-  });
-
-  const change = (next: Doc) => {
+  const edit: Editing["edit"] = (fn, label, group) => {
     setNotice(null);
-    onDocChange(next);
+    editing.edit(fn, label, group);
   };
+
+  const draft = (kind: DrawTool, from: Point, to: Point) =>
+    drawn(kind, from, to, style, "draft");
 
   const actions: StageActions = {
     onSelect: setSelectedId,
-    onDraw: (box) => {
-      if (!doc) return;
-      const id = newId();
-      change(addAnnotation(doc, { ...draft(box), id }));
-      setSelectedId(id);
+    onDraw: (kind, from, to) => {
+      const a = drawn(kind, from, to, style, newId());
+      if (a.kind === "arrow" && degenerate(a)) return;
+      edit((d) => addAnnotation(d, a), "Draw");
+      setSelectedId(a.id);
     },
-    onMove: (id, dx, dy) => {
-      const a = doc?.byId.get(id);
-      if (doc && a) change(updateAnnotation(doc, id, translated(a, dx, dy)));
-    },
-    onResize: (id, box) => {
-      if (doc) change(updateAnnotation(doc, id, box));
-    },
+    onMove: (id, dx, dy) =>
+      edit((d) => {
+        const a = d.byId.get(id);
+        return a ? updateAnnotation(d, id, translated(a, dx, dy)) : d;
+      }, "Move"),
+    onReshape: (id, patch) =>
+      edit((d) => updateAnnotation(d, id, patch), "Resize"),
     onDelete: () => {
-      if (!doc || !selectedId) return;
-      change(removeAnnotations(doc, new Set([selectedId])));
+      if (!selectedId) return;
+      edit((d) => removeAnnotations(d, new Set([selectedId])), "Delete");
       setSelectedId(null);
     },
     onDrawBox: () => {
@@ -129,9 +140,26 @@ export const EditorShell = ({
   };
 
   const restyle = (patch: Partial<Style>) => {
-    if (selected && doc) change(updateAnnotation(doc, selected.id, patch));
-    else setDefaults((current) => ({ ...current, ...patch }));
+    if (!selected) return setDefaults((current) => ({ ...current, ...patch }));
+    // A slider drag is one entry until it is let go; each colour pick is its own.
+    const group =
+      "color" in patch ? undefined : `${Object.keys(patch)[0]}:${selected.id}`;
+    edit((d) => updateAnnotation(d, selected.id, patch), "Restyle", group);
   };
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (isTyping(event.target) || !(event.metaKey || event.ctrlKey)) return;
+      const z = event.key.toLowerCase() === "z";
+      if (z && !event.shiftKey) editing.undo();
+      else if ((z && event.shiftKey) || event.key.toLowerCase() === "y")
+        editing.redo();
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [editing]);
 
   return (
     <div className="flex h-dvh min-h-[560px] flex-col">
@@ -149,6 +177,10 @@ export const EditorShell = ({
             setTool(next);
             setNotice(null);
           }}
+          undoLabel={history?.past.at(-1)?.label ?? null}
+          redoLabel={history?.future[0]?.label ?? null}
+          onUndo={editing.undo}
+          onRedo={editing.redo}
         />
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px]">
           <CanvasStage
@@ -175,6 +207,7 @@ export const EditorShell = ({
                 }
                 style={selected ? styleOf(selected) : style}
                 onChange={restyle}
+                onCommit={editing.seal}
                 onDelete={actions.onDelete}
               />
             ) : (
