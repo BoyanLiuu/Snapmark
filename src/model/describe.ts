@@ -15,8 +15,11 @@ export const KIND_LABEL: Record<Annotation["kind"], string> = {
   pixelate: "Pixelate",
 };
 
-export const annotationCount = (n: number) =>
-  `${n} annotation${n === 1 ? "" : "s"}`;
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+export const annotationCount = (n: number) => count(n, "annotation");
+
+export const imageCount = (n: number) => count(n, "image");
 
 export const nameOf = (a: Annotation) => {
   if (a.kind === "text") return a.text;

@@ -88,6 +88,38 @@ test("Forget asks first, then removes the image and its annotations", async ({
   expect(await stored(page)).toEqual({ images: 0, docs: [] });
 });
 
+test("Forget all asks first, then empties this browser's whole library", async ({
+  page,
+}) => {
+  // Two images: the same bytes under two names would be one record.
+  await openChart(page, "first.png");
+  await drawBox(page);
+  await expect.poll(() => stored(page)).toEqual({ images: 1, docs: [1] });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Open the sample", exact: true })
+    .click();
+  await expect(count(page)).toHaveText("7 annotations");
+  await expect.poll(() => stored(page)).toEqual({ images: 2, docs: [1, 7] });
+
+  await toImages(page);
+  const forgetAll = page.getByRole("button", { name: "Forget all" });
+  await forgetAll.click();
+  await expect(
+    page.getByRole("alertdialog", { name: "Forget every image?" }),
+  ).toContainText("All 2 images leave this browser, with 8 annotations.");
+  await page.getByRole("button", { name: "Keep them" }).click();
+  expect(await stored(page)).toEqual({ images: 2, docs: [1, 7] });
+
+  await forgetAll.click();
+  await page.getByRole("button", { name: "Forget all 2" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No images here yet" }),
+  ).toBeVisible();
+  expect(await stored(page)).toEqual({ images: 0, docs: [] });
+  await expect(forgetAll).toHaveCount(0);
+});
+
 test("unreadable annotations: the picture still opens, and Start without them leaves a working editor", async ({
   page,
 }) => {

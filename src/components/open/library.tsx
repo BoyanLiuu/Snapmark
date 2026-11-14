@@ -2,6 +2,7 @@
 
 import { sizeText } from "@/lib/text";
 import { useCallback, useEffect, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -12,8 +13,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { shortKey } from "@/model/hash";
-import { annotationCount } from "@/model/describe";
-import { forgetImage, listLibrary, type LibraryItem } from "@/model/persist";
+import { annotationCount, imageCount } from "@/model/describe";
+import {
+  forgetEverything,
+  forgetImage,
+  listLibrary,
+  type LibraryItem,
+} from "@/model/persist";
 import { formatWhen } from "../editor/status";
 
 type Listing =
@@ -42,6 +48,19 @@ const Thumb = ({ blob }: { blob: Blob }) => {
   );
 };
 
+/** What Forget all is about to do, in one sentence that reads right for one image or many. */
+const everythingGoes = (images: number, annotations: number) => {
+  const subject =
+    images === 1 ? "The one image here leaves" : `All ${images} images leave`;
+  const theirs =
+    annotations > 0 ? `, with ${annotationCount(annotations)}` : "";
+  const files =
+    images === 1
+      ? "The file on your computer isn’t"
+      : "The files on your computer aren’t";
+  return `${subject} this browser${theirs}. ${files} touched, and this can’t be undone.`;
+};
+
 const Plate = ({
   title,
   children,
@@ -59,7 +78,7 @@ const Plate = ({
 
 /**
  * "In this browser": the images kept here, newest first (screen 01), with their loading (04),
- * empty (05) and storage-blocked (06) states. Forget asks first (07).
+ * empty (05) and storage-blocked (06) states. Forget, one image or all of them, asks first (07).
  */
 export const Library = ({
   forced,
@@ -74,7 +93,9 @@ export const Library = ({
     if (forced === "error") return { state: "blocked" };
     return { state: "loading" };
   });
-  const [forgetting, setForgetting] = useState<LibraryItem | null>(null);
+  const [forgetting, setForgetting] = useState<LibraryItem | "all" | null>(
+    null,
+  );
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -98,6 +119,13 @@ export const Library = ({
 
   const items = listing.state === "ready" ? listing.items : [];
   const total = items.reduce((sum, item) => sum + item.count, 0);
+  const all = forgetting === "all";
+  const one = all ? null : forgetting;
+  /** Either way the list is read again, whether it worked or not. */
+  const forget = () => {
+    if (all) forgetEverything().then(reload, reload);
+    else if (one) forgetImage(one.hash).then(reload, reload);
+  };
 
   return (
     <section
@@ -111,12 +139,24 @@ export const Library = ({
         >
           In this browser
         </h2>
-        <p className="text-sm text-muted-foreground">
-          {listing.state === "blocked"
-            ? "Couldn’t read this browser’s storage"
-            : items.length > 0 &&
-              `${items.length} image${items.length === 1 ? "" : "s"}, ${annotationCount(total)}`}
-        </p>
+        <div className="flex flex-wrap items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            {listing.state === "blocked"
+              ? "Couldn’t read this browser’s storage"
+              : items.length > 0 &&
+                `${imageCount(items.length)}, ${annotationCount(total)}`}
+          </p>
+          {items.length > 0 && (
+            <Button
+              variant="outline"
+              size="control"
+              onClick={() => setForgetting("all")}
+            >
+              <Trash2 />
+              Forget all
+            </Button>
+          )}
+        </div>
       </div>
 
       {listing.state === "loading" && (
@@ -226,28 +266,30 @@ export const Library = ({
       >
         <AlertDialogContent className="gap-6 border bg-card p-10 ring-0 data-[size=default]:max-w-[36rem] data-[size=default]:sm:max-w-[36rem]">
           <AlertDialogTitle className="text-[1.728rem] leading-[1.05] tracking-[-0.04em]">
-            Forget this image?
+            {all ? "Forget every image?" : "Forget this image?"}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-base text-ink-2">
-            <span className="font-mono text-foreground">
-              {forgetting?.name}
-            </span>{" "}
-            leaves this browser.{" "}
-            {forgetting?.count
-              ? `Its ${annotationCount(forgetting.count)} ${forgetting.count === 1 ? "goes" : "go"} with it. `
-              : ""}
-            The file on your computer isn’t touched, and this can’t be undone.
+            {all ? (
+              everythingGoes(items.length, total)
+            ) : (
+              <>
+                <span className="font-mono text-foreground">{one?.name}</span>{" "}
+                leaves this browser.{" "}
+                {one?.count
+                  ? `Its ${annotationCount(one.count)} ${one.count === 1 ? "goes" : "go"} with it. `
+                  : ""}
+                The file on your computer isn’t touched, and this can’t be
+                undone.
+              </>
+            )}
           </AlertDialogDescription>
           <div className="flex gap-3">
-            <AlertDialogAction
-              size="control"
-              onClick={() =>
-                forgetting && forgetImage(forgetting.hash).then(reload, reload)
-              }
-            >
-              Forget image
+            <AlertDialogAction size="control" onClick={forget}>
+              {all ? `Forget all ${items.length}` : "Forget image"}
             </AlertDialogAction>
-            <AlertDialogCancel size="control">Keep it</AlertDialogCancel>
+            <AlertDialogCancel size="control">
+              {all ? "Keep them" : "Keep it"}
+            </AlertDialogCancel>
           </div>
         </AlertDialogContent>
       </AlertDialog>

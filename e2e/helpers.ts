@@ -106,7 +106,10 @@ export const stored = (page: Page) =>
             db.close();
             resolve({
               images: images.result,
-              docs: docs.result.map((d) => d.annotations.length),
+              // Sorted: IndexedDB returns them by hash, which is arbitrary.
+              docs: docs.result
+                .map((d) => d.annotations.length)
+                .sort((a, b) => a - b),
             });
           };
         };

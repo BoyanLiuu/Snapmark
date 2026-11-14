@@ -105,3 +105,13 @@ export const forgetImage = async (hash: string) => {
     tx.done,
   ]);
 };
+
+/** Everything this browser keeps: both stores emptied in one transaction. */
+export const forgetEverything = async () => {
+  const tx = (await db()).transaction(["images", "docs"], "readwrite");
+  await Promise.all([
+    tx.objectStore("images").clear(),
+    tx.objectStore("docs").clear(),
+    tx.done,
+  ]);
+};

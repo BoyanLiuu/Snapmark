@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 | ✅ Done |
 |                          | M19 — The phone                              | ✅ Done |
 
-**Last verified:** 2026-11-14, M19 — `pnpm check` green (format, typecheck, lint, 62 unit tests,
-build); `pnpm test:e2e` 112 passed (56 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, after M19 — `pnpm check` green (format, typecheck, lint, 64 unit
+tests, build); `pnpm test:e2e` 114 passed (57 checks, each at 2x and 1x).
 
 ---
 
@@ -518,3 +518,15 @@ Worth a look by eye — the whole loop on a real phone:
 - [ ] A 20 MP photo exports, not blank, and the budget reads 16 MP
 
 Commit: `responsive: phone layouts for library, annotator and export`
+
+## After the milestones
+
+Asked for, and not in the plan:
+
+- [x] The library says where images and annotations are kept: this browser's own storage on this
+      device, saved as you draw, and what removes them
+- [x] **Forget all** beside the count empties the whole library, behind the same confirm as one
+      image; the pending save is also written when the tab is hidden or closed
+- [x] Check (`e2e/library.spec.ts`, `src/lib/debounce.test.ts`): two images kept, Keep them keeps
+      both, Forget all 2 empties both stores and the button goes; the save runs once after a burst,
+      with the last value. Proven by mutation: clearing only the images leaves the documents behind

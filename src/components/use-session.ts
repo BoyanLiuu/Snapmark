@@ -196,6 +196,19 @@ export const useSession = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc]);
 
+  // The tab is being hidden, reloaded or closed: write now rather than lose the last 400 ms.
+  useEffect(() => {
+    const leaving = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", leaving);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", leaving);
+    };
+  }, [flush]);
+
   return {
     route,
     session,
