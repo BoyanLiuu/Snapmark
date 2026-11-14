@@ -6,7 +6,7 @@ import { fontFor, layoutText, PLATE_PAD } from "../text-layout";
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-const PLATE = "oklch(9% 0.008 75 / 0.74)";
+export const PLATE = "oklch(9% 0.008 75 / 0.74)";
 
 export const drawText = (ctx: Ctx, a: TextA) => {
   const { lines, widest, lineHeight } = layoutText(a);

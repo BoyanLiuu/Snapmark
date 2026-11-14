@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type MouseEvent,
   type PointerEvent,
   type ReactNode,
   type Ref,
@@ -34,12 +35,13 @@ import { useRefValue } from "@/lib/use-ref-value";
 import { outline } from "@/model/bbox";
 import { tagOf } from "@/model/describe";
 import type { LoadedImage } from "@/model/image";
-import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
+import type { Annotation, Doc, Id, Point, Size, TextA } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
 import { drawOverlay, drawSelection } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
 import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
+import { placeTextEditor, TextEditor } from "./text-editor";
 import { useCamera, type StageCamera } from "./use-camera";
 import type { Notice } from "./use-copy";
 
@@ -108,6 +110,11 @@ const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
   </div>
 );
 
+export interface Writing {
+  annotation: TextA;
+  onDone: (text: string | null) => void;
+}
+
 export interface StageActions {
   onSelect: (id: Id | null) => void;
   onDraw: (tool: DrawTool, from: Point, to: Point) => void;
@@ -115,6 +122,10 @@ export interface StageActions {
   onReshape: (id: Id, patch: Partial<Annotation>) => void;
   onDelete: () => void;
   onDrawBox: () => void;
+  /** The text tool pressed on empty ground. */
+  onWrite: (at: Point) => void;
+  /** A label double-clicked. */
+  onEditText: (id: Id) => void;
 }
 
 /**
@@ -135,6 +146,7 @@ export const CanvasStage = ({
   zoom,
   scale,
   onZoomSettle,
+  writing,
   ref,
   children,
 }: {
@@ -153,6 +165,8 @@ export const CanvasStage = ({
   scale: Store<number | null>;
   /** After zooming or panning stops, for the address. */
   onZoomSettle: (zoom: Zoom) => void;
+  /** The label being edited, over the canvas, or null. */
+  writing: Writing | null;
   ref?: Ref<StageCamera>;
   /** Covers the stage, and takes the pointer from it (screen 11). */
   children?: ReactNode;
@@ -172,6 +186,8 @@ export const CanvasStage = ({
   const draftRef = useRefValue(draft);
   const actionsRef = useRefValue(actions);
   const panRef = useRef<Point | null>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const writingRef = useRefValue(writing);
   const spaceRef = useRef(false);
   const { frameCamera, camera, setCamera } = useCamera({
     viewRef,
@@ -222,6 +238,9 @@ export const CanvasStage = ({
         container.dataset.baseDraws = String(next.baseDraws);
         container.dataset.overlayDraws = String(next.overlayDraws);
         if (imageRef.current) scale.set(next.camera.scale);
+        const text = writingRef.current?.annotation;
+        if (textRef.current && text)
+          placeTextEditor(textRef.current, text, next.camera);
         if (debugRef.current) setStats(next);
       },
     });
@@ -244,9 +263,11 @@ export const CanvasStage = ({
     viewRef.current?.invalidate();
   }, [doc]);
 
+  // A new selection, or a label opened for editing: the next frame draws it, and places the editor.
+  const writingText = writing?.annotation;
   useEffect(() => {
     viewRef.current?.invalidate("overlay");
-  }, [selected]);
+  }, [selected, writingText]);
 
   useEffect(() => {
     // Draw one frame so the readout has numbers as soon as it appears.
@@ -254,7 +275,7 @@ export const CanvasStage = ({
   }, [debug]);
 
   const pointerAt = (
-    event: PointerEvent<HTMLCanvasElement>,
+    event: MouseEvent<HTMLCanvasElement>,
   ): PointerAt | null => {
     const view = viewRef.current;
     if (!view) return null;
@@ -278,6 +299,7 @@ export const CanvasStage = ({
         act.onDraw(effect.tool, effect.from, effect.to);
       else if (effect.kind === "reshape")
         act.onReshape(effect.id, effect.patch);
+      else if (effect.kind === "write") act.onWrite(effect.at);
       else act.onMove(effect.id, effect.dx, effect.dy);
     }
   };
@@ -322,6 +344,12 @@ export const CanvasStage = ({
   const down = (event: PointerEvent<HTMLCanvasElement>) => {
     const at = pointerAt(event);
     if (!at || !docRef.current || !imageRef.current) return;
+    // A press while a label is open commits it, and does nothing else.
+    if (writingRef.current) {
+      event.preventDefault();
+      textRef.current?.blur();
+      return;
+    }
     if (event.button === 1 || (event.button === 0 && spaceRef.current)) {
       event.preventDefault();
       event.currentTarget.setPointerCapture(event.pointerId);
@@ -377,6 +405,13 @@ export const CanvasStage = ({
     // A change keeps its preview until the new document arrives, so nothing flickers.
     if (!effects.some((e) => e.kind !== "select")) show(IDLE);
     apply(effects);
+  };
+
+  const doubleClick = (event: MouseEvent<HTMLCanvasElement>) => {
+    const at = pointerAt(event);
+    const hit = at ? hitAt(at) : null;
+    if (hit && docRef.current?.byId.get(hit)?.kind === "text")
+      actionsRef.current.onEditText(hit);
   };
 
   const cancel = () => {
@@ -454,10 +489,21 @@ export const CanvasStage = ({
           onPointerUp={up}
           onPointerCancel={cancel}
           onPointerLeave={leave}
+          onDoubleClick={doubleClick}
+          // A press on the picture never moves focus, so a label editor it opens keeps it.
+          onMouseDown={(event) => event.preventDefault()}
         />
         {decoding && <DecodingPlate {...decoding} />}
         {image && doc && doc.order.length === 0 && !children && (
           <EmptyPlate onDrawBox={actions.onDrawBox} />
+        )}
+        {writing && (
+          <TextEditor
+            key={writing.annotation.id}
+            ref={textRef}
+            annotation={writing.annotation}
+            onDone={writing.onDone}
+          />
         )}
         {children}
       </div>

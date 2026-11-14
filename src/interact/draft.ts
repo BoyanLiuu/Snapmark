@@ -1,5 +1,5 @@
 import type { SwatchId } from "@/model/palette";
-import type { Annotation, Point } from "@/model/types";
+import type { Annotation, Point, TextA } from "@/model/types";
 import type { DrawTool } from "./machine";
 
 export interface Look {
@@ -45,3 +45,29 @@ export const drawn = (
     };
   return { id, kind: "rect", ...look, ...box };
 };
+
+/** ARCHITECTURE.md §3: a stroke that reads the same on any image, in image px. */
+export const defaultStroke = (naturalWidth: number) =>
+  Math.max(2, Math.round(naturalWidth / 400));
+
+/**
+ * A new, empty label at `at`, as the design file starts one: white on a plate, type five times the
+ * image's default stroke, wrapping at 22% of the image's width.
+ */
+export const labelAt = (
+  at: Point,
+  naturalWidth: number,
+  look: Look,
+  id: string,
+): TextA => ({
+  id,
+  kind: "text",
+  ...look,
+  color: "white",
+  x: at.x,
+  y: at.y,
+  width: Math.round(naturalWidth * 0.22),
+  text: "",
+  fontSize: defaultStroke(naturalWidth) * 5,
+  plate: true,
+});

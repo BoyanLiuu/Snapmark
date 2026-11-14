@@ -1,6 +1,6 @@
 /**
- * Handles, per kind: eight on a box, one at each end of an arrow, none on text until M13. Drawn and
- * hit at 8 screen px at any zoom, converted to image px only where they are used.
+ * Handles, per kind: eight on a box, one at each end of an arrow, one on a label's right edge for
+ * its wrap width. Drawn and hit at 8 screen px at any zoom, converted to image px where used.
  */
 
 import { outline } from "@/model/bbox";
@@ -17,8 +17,9 @@ export const handlesOf = (a: Annotation): [Handle, Point][] => {
       ["start", { x: a.x1, y: a.y1 }],
       ["end", { x: a.x2, y: a.y2 }],
     ];
-  if (a.kind === "text") return [];
   const box = outline(a);
+  if (a.kind === "text")
+    return [["e", { x: a.x + a.width, y: box.y + box.h / 2 }]];
   return HANDLES.map((h) => [h, handlePoint(box, h)]);
 };
 
@@ -44,6 +45,11 @@ export const reshape = (
   if (start.kind === "arrow")
     return {
       patch: handle === "start" ? { x1: p.x, y1: p.y } : { x2: p.x, y2: p.y },
+      handle,
+    };
+  if (start.kind === "text")
+    return {
+      patch: { width: Math.max(start.fontSize, p.x - start.x) },
       handle,
     };
   const { box, handle: held } = resize(

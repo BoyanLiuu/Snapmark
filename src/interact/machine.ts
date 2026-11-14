@@ -54,7 +54,9 @@ export type Effect =
   | { kind: "select"; id: Id | null }
   | { kind: "draw"; tool: DrawTool; from: Point; to: Point }
   | { kind: "move"; id: Id; dx: number; dy: number }
-  | { kind: "reshape"; id: Id; patch: Partial<Annotation> };
+  | { kind: "reshape"; id: Id; patch: Partial<Annotation> }
+  /** Start a label at this image point (M13). */
+  | { kind: "write"; at: Point };
 
 export const IDLE: Gesture = { kind: "idle" };
 
@@ -98,6 +100,8 @@ export const press = (
       },
       [deselect],
     ];
+  if (tool === "text")
+    return [IDLE, [deselect, { kind: "write", at: at.image }]];
   return [IDLE, [deselect]];
 };
 

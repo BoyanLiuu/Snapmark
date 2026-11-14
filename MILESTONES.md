@@ -25,16 +25,16 @@ decisions log.
 |                          | M10 — Routes and dead ends                   | ✅ Done |
 | D · The learning goals   | M11 — The camera, zoom does not leak         | ✅ Done |
 |                          | M12 — Highlight and the four-pass compositor | ✅ Done |
-|                          | M13 — Text that exports identically          | ⏭ Next  |
-|                          | M14 — Pixelate, kept live                    |         |
+|                          | M13 — Text that exports identically          | ✅ Done |
+|                          | M14 — Pixelate, kept live                    | ⏭ Next  |
 | E · The whole flow board | M15 — Layers and multi-select                |         |
 |                          | M16 — Export, the whole dialog               |         |
 |                          | M17 — Out of bounds                          |         |
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M12 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
-build); `pnpm test:e2e` 80 passed (40 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M13 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
+build); `pnpm test:e2e` 84 passed (42 checks, each at 2x and 1x).
 
 ---
 
@@ -350,8 +350,8 @@ Commit: `library: IndexedDB store keyed by image hash, with empty, loading and b
 - [x] Check (`e2e/routes.spec.ts` at 2x and 1x): screens 33 and 32 from their addresses; a box's
       address opened in a new tab has the same tool and the same box selected; the open page's
       and the editor's states from their parameters
-- [ ] Later: `edit` (M13), `format` and the export's `state` (M16), more than one id in
-      `select` (M15). (`zoom` and `at` arrived with M11.)
+- [ ] Later: `format` and the export's `state` (M16), more than one id in `select` (M15).
+      (`zoom` and `at` arrived with M11, `edit` with M13.)
 
 Worth a look by eye:
 
@@ -400,3 +400,22 @@ Worth a look by eye:
 - [ ] Highlight a line of text in a screenshot: it stays readable
 
 Commit: `highlight: multiply pass ordered before opaque annotations`
+
+## M13 — Text that exports identically ✅
+
+- [x] `render/text-layout.ts`: one shared measuring context, widths cached by font and string,
+      greedy wrap against the label's width, a fixed 1.25 line height
+- [x] The text tool opens a label in a textarea over the canvas (screen 17), placed from each
+      frame's camera; a double-click or **Edit text** reopens one; blur or ⌘Enter commits, Esc
+      cancels, `?edit=<id>` opens one from the address — `components/editor/text-editor.tsx`
+- [x] A handle on a label's right edge sets its wrap width; the inspector adds Size and the plate
+- [x] Check (`e2e/text.spec.ts` at 2x and 1x): a label written, listed by its words, edited in
+      place, reopened from the address after a reload, and left as it was by Esc; narrowing it by
+      its handle wraps it onto more lines
+
+Worth a look by eye:
+
+- [ ] Write a 40-word label with the plate, export it, and compare the line breaks with the screen
+- [ ] Drag a long label around: no drop in frame rate
+
+Commit: `text: wrapped canvas text with plate and DOM editing overlay`

@@ -6,7 +6,7 @@ import { degenerate } from "@/geom/arrow";
 import type { History } from "@/history/undo";
 import { renderPng } from "@/export/render";
 import { MAX_SCALE, MIN_SCALE, type Zoom } from "@/geom/camera";
-import { drawn } from "@/interact/draft";
+import { defaultStroke, drawn, labelAt } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
 import { go, setQuery, type Route } from "@/lib/route";
 import { createStore } from "@/lib/store";
@@ -19,13 +19,13 @@ import {
   withoutIds,
 } from "@/model/doc";
 import type { LoadedImage } from "@/model/image";
-import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
+import type { Annotation, Doc, Id, Point, Size, TextA } from "@/model/types";
 import { SampleNotice } from "../open/sample-notice";
 import { useSessionActions, useSessionStore } from "../session-store";
 import { AppBar } from "./app-bar";
 import { CanvasStage, type StageActions } from "./canvas-stage";
 import { EditorBar } from "./editor-bar";
-import { defaultStroke, Inspector, type Style } from "./inspector";
+import { Inspector, type Style, type StylePatch } from "./inspector";
 import { Kbd } from "./kbd";
 import { LayerList } from "./layer-list";
 import { layerRows } from "./layers";
@@ -60,6 +60,19 @@ export type EditorSession =
     };
 
 const NONE: ReadonlySet<Id> = new Set();
+
+type Writing = { id: Id } | { fresh: TextA };
+
+/** The label a writing state stands for: the new one, or the one in the document. */
+const labelOf = (writing: Writing | null, doc: Doc | null): TextA | null => {
+  if (!writing) return null;
+  if ("fresh" in writing) return writing.fresh;
+  const a = doc?.byId.get(writing.id);
+  return a?.kind === "text" ? a : null;
+};
+
+/** The inspector's sliders: a drag of one is a single undo entry. */
+const SLIDERS = new Set(["strokeWidth", "opacity", "fontSize"]);
 
 /** `?zoom=400&at=3010,975`: a scale in percent, and the image point at the view's centre. */
 const zoomFrom = (route: Route): Zoom => {
@@ -111,6 +124,11 @@ export const EditorShell = ({
     actualSize: () => stage.current?.actualSize(),
   };
   const [notice, setNotice] = useState<Notice | null>(null);
+  // The label open in its editor: one in the document, or a new one not yet in it (?edit=, M13).
+  const [writing, setWriting] = useState<Writing | null>(() => {
+    const id = route.query.get("edit");
+    return id ? { id } : null;
+  });
   // The stroke follows the image's width until it is set by hand.
   const [defaults, setDefaults] = useState<
     Omit<Style, "strokeWidth"> & { strokeWidth: number | null }
@@ -126,11 +144,15 @@ export const EditorShell = ({
   const unreadable = ready?.unreadable ?? false;
   const doc = ready?.doc ?? null;
   const hidden = ready?.hidden ?? NONE;
-  const shown = useMemo(
-    () => (doc ? withoutIds(doc, hidden) : null),
-    [doc, hidden],
-  );
   const selected = (selectedId && doc?.byId.get(selectedId)) || null;
+  const editingId = writing && "id" in writing ? writing.id : null;
+  const writingText = labelOf(writing, doc);
+  // A label being edited shows in its editor, not on the canvas under it.
+  const shown = useMemo(() => {
+    if (!doc) return null;
+    if (!editingId) return withoutIds(doc, hidden);
+    return withoutIds(doc, new Set([...hidden, editingId]));
+  }, [doc, hidden, editingId]);
   const style: Style = {
     ...defaults,
     strokeWidth: defaults.strokeWidth ?? defaultStroke(natural?.w ?? 0),
@@ -169,13 +191,40 @@ export const EditorShell = ({
       actions.setTool("rect");
       setNotice({ text: "Rectangle: drag across the picture to draw a box." });
     },
+    onWrite: (at) => {
+      if (natural)
+        setWriting({ fresh: labelAt(at, natural.w, style, newId()) });
+    },
+    onEditText: (id) => {
+      actions.select(id);
+      setWriting({ id });
+    },
   };
 
-  const restyle = (patch: Partial<Style>) => {
+  /** The editor closed: add, change or remove the label, or, with null, leave it be. */
+  const finishWriting = (value: string | null) => {
+    const label = writingText;
+    const fresh = writing !== null && "fresh" in writing;
+    setWriting(null);
+    if (value === null || !label) return;
+    const text = value.trim();
+    if (fresh) {
+      if (!text) return;
+      edit((d) => addAnnotation(d, { ...label, text }), "Write");
+      actions.select(label.id);
+      actions.setTool("select");
+    } else if (!text) {
+      edit((d) => removeAnnotations(d, new Set([label.id])), "Delete");
+      actions.select(null);
+    } else if (text !== label.text)
+      edit((d) => updateAnnotation(d, label.id, { text }), "Edit text");
+  };
+
+  const restyle = (patch: StylePatch) => {
     if (!selected) return setDefaults((current) => ({ ...current, ...patch }));
-    // A slider drag is one entry until it is let go; each colour pick is its own.
-    const group =
-      "color" in patch ? undefined : `${Object.keys(patch)[0]}:${selected.id}`;
+    // A slider drag is one entry until it is let go; a colour pick or a switch is its own.
+    const field = Object.keys(patch)[0];
+    const group = SLIDERS.has(field) ? `${field}:${selected.id}` : undefined;
     edit((d) => updateAnnotation(d, selected.id, patch), "Restyle", group);
   };
 
@@ -202,8 +251,12 @@ export const EditorShell = ({
   const selection = selected?.id ?? null;
   useEffect(() => {
     if (!live) return;
-    setQuery({ tool: tool === "select" ? null : tool, select: selection });
-  }, [live, tool, selection]);
+    setQuery({
+      tool: tool === "select" ? null : tool,
+      select: selection,
+      edit: editingId,
+    });
+  }, [live, tool, selection, editingId]);
 
   const exportPage = () => {
     const clipboard = route.query.get("clipboard");
@@ -260,6 +313,11 @@ export const EditorShell = ({
             selected={selected?.id ?? null}
             draft={draft}
             actions={stageActions}
+            writing={
+              writingText
+                ? { annotation: writingText, onDone: finishWriting }
+                : null
+            }
             ref={stage}
             zoom={zoom}
             scale={scale}
@@ -298,6 +356,9 @@ export const EditorShell = ({
                 onChange={restyle}
                 onCommit={actions.seal}
                 onDelete={stageActions.onDelete}
+                onEditText={() =>
+                  selected && stageActions.onEditText(selected.id)
+                }
               />
             ) : (
               <div className="min-h-12 border-b" />

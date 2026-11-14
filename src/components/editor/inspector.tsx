@@ -1,14 +1,16 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { arrowLength } from "@/geom/arrow";
+import { defaultStroke } from "@/interact/draft";
 import { outline } from "@/model/bbox";
 import { KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
-import type { Annotation } from "@/model/types";
+import type { Annotation, TextA } from "@/model/types";
 
 // Tailwind needs whole class names, so each swatch's classes are spelled out here.
 const SWATCH_CLASS: Record<SwatchId, string> = {
@@ -23,10 +25,6 @@ const SWATCH_CLASS: Record<SwatchId, string> = {
   white:
     "bg-swatch-white hover:bg-swatch-white data-[state=on]:bg-swatch-white",
 };
-
-/** ARCHITECTURE.md §3: a stroke that reads the same on any image, in image px. */
-export const defaultStroke = (naturalWidth: number) =>
-  Math.max(2, Math.round(naturalWidth / 400));
 
 /** Why the default is what it is, with the arithmetic, as the design file shows it. */
 const strokeReason = (naturalWidth: number, stroke: number) =>
@@ -110,6 +108,9 @@ const factsOf = (a: Annotation): [string, string][][] => {
   ];
 };
 
+/** What the inspector changes: the look, and a label's size and plate. */
+export type StylePatch = Partial<Style & Pick<TextA, "fontSize" | "plate">>;
+
 /** The look a new annotation is drawn with, and what the inspector edits on a selected one. */
 export interface Style {
   color: SwatchId;
@@ -130,13 +131,15 @@ export const Inspector = ({
   onChange,
   onCommit,
   onDelete,
+  onEditText,
 }: {
   subject: { naturalWidth: number } | { selected: Annotation };
   style: Style;
   /** A slider drag calls this many times and `onCommit` once, when it lets go. */
-  onChange: (patch: Partial<Style>) => void;
+  onChange: (patch: StylePatch) => void;
   onCommit: () => void;
   onDelete: () => void;
+  onEditText: () => void;
 }) => {
   const selected = "selected" in subject ? subject.selected : null;
   const kind = selected?.kind;
@@ -200,6 +203,27 @@ export const Inspector = ({
           onCommit={onCommit}
         />
       )}
+      {selected?.kind === "text" && (
+        <>
+          <RangeField
+            id="size"
+            label="Size"
+            value={Math.round(selected.fontSize)}
+            min={8}
+            max={Math.max(200, Math.round(selected.fontSize * 2))}
+            unit={"\u00a0px"}
+            onChange={(fontSize) => onChange({ fontSize })}
+            onCommit={onCommit}
+          />
+          <label className="flex items-center gap-3 text-sm text-ink-2">
+            <Switch
+              checked={selected.plate}
+              onCheckedChange={(plate) => onChange({ plate })}
+            />
+            Plate behind the text
+          </label>
+        </>
+      )}
       <RangeField
         id="opacity"
         label="Opacity"
@@ -235,6 +259,12 @@ export const Inspector = ({
             </dl>
           ))}
           <div className="flex flex-wrap gap-2">
+            {selected?.kind === "text" && (
+              <Button variant="outline" size="control" onClick={onEditText}>
+                <Pencil />
+                Edit text
+              </Button>
+            )}
             <Button
               variant="outline"
               size="control"
