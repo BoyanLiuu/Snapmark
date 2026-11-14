@@ -34,7 +34,7 @@ decisions log.
 |                          | M19 — The phone                              | ✅ Done |
 
 **Last verified:** 2026-11-14, after M19 — `pnpm check` green (format, typecheck, lint, 64 unit
-tests, build); `pnpm test:e2e` 114 passed (57 checks, each at 2x and 1x).
+tests, build); `pnpm test:e2e` 118 passed (59 checks, each at 2x and 1x).
 
 ---
 
@@ -530,3 +530,8 @@ Asked for, and not in the plan:
 - [x] Check (`e2e/library.spec.ts`, `src/lib/debounce.test.ts`): two images kept, Keep them keeps
       both, Forget all 2 empties both stores and the button goes; the save runs once after a burst,
       with the last value. Proven by mutation: clearing only the images leaves the documents behind
+- [x] Every icon control says what it does, on hover **and on focus**, in a plate of the design
+      file's own kind; the pointer is a hand over controls and not-allowed when they are off
+- [x] Check (`e2e/shell.spec.ts`): hovering the rectangle reads "Rectangle (R)" and the hint goes
+      when the pointer does; focusing the arrow reads "Arrow (A)"; a disabled Undo takes the
+      not-allowed cursor. Proven by mutation: without the provider, and without the pointer cursor

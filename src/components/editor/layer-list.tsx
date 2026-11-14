@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { annotationCount } from "@/model/describe";
 import type { Id } from "@/model/types";
 import type { LayerRow } from "./layers";
+import { Hint } from "./hint";
 import { KIND_ICON } from "./tools";
 
 /** Three placeholder rows while the image decodes (screen 08). */
@@ -118,13 +119,14 @@ export const LayerList = ({
                   "shadow-[inset_0_2px_0_var(--primary)]",
               )}
             >
-              <span
-                aria-hidden
-                title="Drag to change what sits on top"
-                className="grid cursor-grab place-items-center text-muted-2"
-              >
-                <GripVertical className="size-4 [stroke-width:2.5]" />
-              </span>
+              <Hint side="right" text="Drag to change what sits on top">
+                <span
+                  aria-hidden
+                  className="grid cursor-grab place-items-center text-muted-2"
+                >
+                  <GripVertical className="size-4 [stroke-width:2.5]" />
+                </span>
+              </Hint>
               <button
                 type="button"
                 aria-pressed={isSelected}
@@ -150,16 +152,25 @@ export const LayerList = ({
                   {dims}
                 </span>
               </button>
-              <Button
-                variant="ghost"
-                size="icon-control"
-                className="size-8 [&_svg:not([class*='size-'])]:size-4"
-                aria-pressed={!isHidden}
-                aria-label={`${isHidden ? "Show" : "Hide"} ${name}`}
-                onClick={() => onToggleHidden(id)}
+              <Hint
+                side="left"
+                text={
+                  isHidden
+                    ? "Hidden: left out of the canvas and the export"
+                    : "Hide it, here and in the export"
+                }
               >
-                {isHidden ? <EyeOff /> : <Eye />}
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-control"
+                  className="size-8 [&_svg:not([class*='size-'])]:size-4"
+                  aria-pressed={!isHidden}
+                  aria-label={`${isHidden ? "Show" : "Hide"} ${name}`}
+                  onClick={() => onToggleHidden(id)}
+                >
+                  {isHidden ? <EyeOff /> : <Eye />}
+                </Button>
+              </Hint>
             </li>
           );
         })}

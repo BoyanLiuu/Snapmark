@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Store } from "@/lib/store";
 import { nbsp } from "@/lib/text";
+import { Hint } from "./hint";
 import { ZOOM_STEP, type StageCamera } from "./use-camera";
 import { TOOLS, type ToolId } from "./tools";
 import type { Copying } from "./use-copy";
@@ -29,6 +30,10 @@ const ZoomReadout = ({
     </output>
   );
 };
+
+/** "Undo draw (⌘Z)", or just "Undo (⌘Z)" when there is nothing to step over. */
+const stepHint = (verb: string, label: string | null, keys: string) =>
+  label ? `${verb} ${label.toLowerCase()} (${keys})` : `${verb} (${keys})`;
 
 const copyLabel = (copy: Copying | null) => {
   if (copy?.downloads) return "Download PNG";
@@ -101,47 +106,41 @@ export const EditorBar = ({
         onValueChange={(value) => value && onToolChange(value as ToolId)}
       >
         {TOOLS.map(({ id, label, shortcut, icon: Icon }) => (
-          <ToggleGroupItem
-            key={id}
-            value={id}
-            aria-label={label}
-            title={`${label} (${shortcut})`}
-            className="relative size-9 min-w-9 px-0 text-ink-2 hover:bg-card hover:text-foreground data-[state=on]:bg-paper-3 data-[state=on]:text-foreground data-[state=on]:shadow-[inset_0_0_0_1px_var(--border)] data-[state=on]:after:absolute data-[state=on]:after:top-[3px] data-[state=on]:after:right-[3px] data-[state=on]:after:size-[5px] data-[state=on]:after:bg-primary"
-          >
-            <Icon className="size-5" />
-          </ToggleGroupItem>
+          <Hint key={id} text={`${label} (${shortcut})`}>
+            <ToggleGroupItem
+              value={id}
+              aria-label={label}
+              className="relative size-9 min-w-9 px-0 text-ink-2 hover:bg-card hover:text-foreground data-[state=on]:bg-paper-3 data-[state=on]:text-foreground data-[state=on]:shadow-[inset_0_0_0_1px_var(--border)] data-[state=on]:after:absolute data-[state=on]:after:top-[3px] data-[state=on]:after:right-[3px] data-[state=on]:after:size-[5px] data-[state=on]:after:bg-primary"
+            >
+              <Icon className="size-5" />
+            </ToggleGroupItem>
+          </Hint>
         ))}
       </ToggleGroup>
 
       <div className="flex items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="icon-control"
-          aria-label="Undo"
-          title={
-            undoLabel
-              ? `Undo ${undoLabel.toLowerCase()} (⌘Z)`
-              : "Nothing to undo"
-          }
-          disabled={!undoLabel}
-          onClick={onUndo}
-        >
-          <Undo2 />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-control"
-          aria-label="Redo"
-          title={
-            redoLabel
-              ? `Redo ${redoLabel.toLowerCase()} (⇧⌘Z)`
-              : "Nothing to redo"
-          }
-          disabled={!redoLabel}
-          onClick={onRedo}
-        >
-          <Redo2 />
-        </Button>
+        <Hint text={stepHint("Undo", undoLabel, "⌘Z")}>
+          <Button
+            variant="ghost"
+            size="icon-control"
+            aria-label="Undo"
+            disabled={!undoLabel}
+            onClick={onUndo}
+          >
+            <Undo2 />
+          </Button>
+        </Hint>
+        <Hint text={stepHint("Redo", redoLabel, "⇧⌘Z")}>
+          <Button
+            variant="ghost"
+            size="icon-control"
+            aria-label="Redo"
+            disabled={!redoLabel}
+            onClick={onRedo}
+          >
+            <Redo2 />
+          </Button>
+        </Hint>
       </div>
 
       <div
@@ -149,67 +148,76 @@ export const EditorBar = ({
         aria-label="Zoom"
         className="ml-auto flex items-center gap-0.5 max-[40rem]:ml-0 max-[40rem]:w-full max-[40rem]:justify-between"
       >
-        <Button
-          variant="ghost"
-          size="icon-control"
-          aria-label="Zoom out"
-          title="Zoom out (−)"
-          disabled={!camera}
-          onClick={() => camera?.zoomBy(1 / ZOOM_STEP)}
-        >
-          <Minus />
-        </Button>
+        <Hint text="Zoom out (−)">
+          <Button
+            variant="ghost"
+            size="icon-control"
+            aria-label="Zoom out"
+            disabled={!camera}
+            onClick={() => camera?.zoomBy(1 / ZOOM_STEP)}
+          >
+            <Minus />
+          </Button>
+        </Hint>
         <ZoomReadout scale={scale} size={size} />
-        <Button
-          variant="ghost"
-          size="icon-control"
-          aria-label="Zoom in"
-          title="Zoom in (+)"
-          disabled={!camera}
-          onClick={() => camera?.zoomBy(ZOOM_STEP)}
-        >
-          <Plus />
-        </Button>
-        <Button
-          variant="outline"
-          size="control"
-          className="min-w-11 px-3"
-          title="Fit the whole image (⇧1)"
-          disabled={!camera}
-          onClick={camera?.fit}
-        >
-          Fit
-        </Button>
-        <Button
-          variant="outline"
-          size="control"
-          className="min-w-11 px-3"
-          title="One image pixel per screen pixel (⇧0)"
-          disabled={!camera}
-          onClick={camera?.actualSize}
-        >
-          1:1
-        </Button>
+        <Hint text="Zoom in (+)">
+          <Button
+            variant="ghost"
+            size="icon-control"
+            aria-label="Zoom in"
+            disabled={!camera}
+            onClick={() => camera?.zoomBy(ZOOM_STEP)}
+          >
+            <Plus />
+          </Button>
+        </Hint>
+        <Hint text="Fit the whole image (⇧1)">
+          <Button
+            variant="outline"
+            size="control"
+            className="min-w-11 px-3"
+            disabled={!camera}
+            onClick={camera?.fit}
+          >
+            Fit
+          </Button>
+        </Hint>
+        <Hint text="One image pixel per screen pixel (⇧0)">
+          <Button
+            variant="outline"
+            size="control"
+            className="min-w-11 px-3"
+            disabled={!camera}
+            onClick={camera?.actualSize}
+          >
+            1:1
+          </Button>
+        </Hint>
       </div>
 
       <div className="flex gap-2 max-[40rem]:grid max-[40rem]:w-full max-[40rem]:grid-cols-2">
-        <Button
-          variant="outline"
-          size="control"
-          disabled={!copy}
-          onClick={onExport}
+        <Hint text="Export a PNG, a JPEG, or the annotations as JSON">
+          <Button
+            variant="outline"
+            size="control"
+            disabled={!copy}
+            onClick={onExport}
+          >
+            Export
+          </Button>
+        </Hint>
+        <Hint
+          text={copy?.reason ?? "Copy the PNG at the image’s own size (⌘C)"}
         >
-          Export
-        </Button>
-        <Button
-          size="control"
-          className="min-w-[8.5rem]"
-          disabled={!copy}
-          title={copy?.reason ?? "Copy the PNG at the image’s own size"}
-          onClick={copy?.copy}
-        >
-          {copyLabel(copy)}
-        </Button>
+          <Button
+            size="control"
+            className="min-w-[8.5rem]"
+            disabled={!copy}
+            onClick={copy?.copy}
+          >
+            {copyLabel(copy)}
+          </Button>
+        </Hint>
       </div>
     </div>
   );

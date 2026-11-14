@@ -11,6 +11,7 @@ import { outline, union, type Box } from "@/model/bbox";
 import { annotationCount, KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
 import type { Annotation, PixelateA, TextA } from "@/model/types";
+import { Hint } from "./hint";
 
 // Tailwind needs whole class names, so each swatch's classes are spelled out here.
 const SWATCH_CLASS: Record<SwatchId, string> = {
@@ -350,26 +351,28 @@ export const Inspector = ({
                 Edit text
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="control"
-              disabled={!steps?.up}
-              title="One step up the paint order (⌥↑)"
-              onClick={() => onStep(1)}
-            >
-              <ChevronUp />
-              Forward
-            </Button>
-            <Button
-              variant="outline"
-              size="control"
-              disabled={!steps?.down}
-              title="One step down the paint order (⌥↓)"
-              onClick={() => onStep(-1)}
-            >
-              <ChevronDown />
-              Backward
-            </Button>
+            <Hint text="One step up the paint order (⌥↑)">
+              <Button
+                variant="outline"
+                size="control"
+                disabled={!steps?.up}
+                onClick={() => onStep(1)}
+              >
+                <ChevronUp />
+                Forward
+              </Button>
+            </Hint>
+            <Hint text="One step down the paint order (⌥↓)">
+              <Button
+                variant="outline"
+                size="control"
+                disabled={!steps?.down}
+                onClick={() => onStep(-1)}
+              >
+                <ChevronDown />
+                Backward
+              </Button>
+            </Hint>
           </div>
           <div>
             <Button variant="outline" size="control" onClick={onDelete}>

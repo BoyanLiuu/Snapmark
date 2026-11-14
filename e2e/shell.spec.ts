@@ -98,3 +98,36 @@ test("the tab icon is Snapmark's mark, served from this app", async ({
   expect(dark(drawn.inside)).toBe(true);
   expect(dark(drawn.corner)).toBe(true);
 });
+
+test("every icon control says what it does on hover and on focus, and takes a pointer", async ({
+  page,
+}) => {
+  await openChart(page);
+  const cursorOf = (name: string) =>
+    page
+      .getByRole("radio", { name })
+      .evaluate((el) => getComputedStyle(el).cursor);
+  expect(await cursorOf("Rectangle")).toBe("pointer");
+  expect(
+    await page
+      .getByRole("button", { name: "Fit" })
+      .evaluate((el) => getComputedStyle(el).cursor),
+  ).toBe("pointer");
+
+  await page.getByRole("radio", { name: "Rectangle" }).hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Rectangle (R)");
+  // Away again, and the hint goes with the pointer.
+  await page.mouse.move(4, 400);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+
+  // The keyboard gets it too, which a native title never does.
+  await page.getByRole("radio", { name: "Arrow" }).focus();
+  await expect(page.getByRole("tooltip")).toHaveText("Arrow (A)");
+
+  // A disabled control says so with its cursor; the browser gives it no hover to hint with.
+  const undo = page.getByRole("button", { name: "Undo" });
+  await expect(undo).toBeDisabled();
+  expect(await undo.evaluate((el) => getComputedStyle(el).cursor)).toBe(
+    "not-allowed",
+  );
+});

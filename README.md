@@ -50,6 +50,7 @@ src/
   components/open/      the open screen: pick, drop, paste, the hero lenses, the library (screen 32 too)
   components/export/    the export page
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
+                        (hint.tsx: what a control does, on hover and on focus)
   model/types.ts        ALL geometry is image space: the annotation types
   model/doc.ts          the document: annotations by id, in paint order
   model/palette.ts      the six colours
