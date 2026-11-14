@@ -65,3 +65,12 @@ export const bbox = (a: Annotation): Box => {
     h: box.h + 2 * half,
   };
 };
+
+/** The smallest box around all of these. */
+export const union = (boxes: readonly Box[]): Box => {
+  const x = Math.min(...boxes.map((b) => b.x));
+  const y = Math.min(...boxes.map((b) => b.y));
+  const right = Math.max(...boxes.map((b) => b.x + b.w));
+  const bottom = Math.max(...boxes.map((b) => b.y + b.h));
+  return { x, y, w: right - x, h: bottom - y };
+};

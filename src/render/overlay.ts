@@ -112,3 +112,44 @@ export const drawSelection = (
   ctx.textBaseline = "middle";
   ctx.fillText(tag, mid, top + h / 2);
 };
+
+/** One member of a multi-selection, or what a marquee would pick: a dashed outline (screen 16). */
+export const drawMember = (
+  ctx: CanvasRenderingContext2D,
+  { camera, size }: Frame,
+  box: Box,
+) => {
+  const a = toScreen(camera, { x: box.x, y: box.y });
+  const b = toScreen(camera, { x: box.x + box.w, y: box.y + box.h });
+  ctx.save();
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = 1 / size.dpr;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(
+    hairline(a.x, size.dpr),
+    hairline(a.y, size.dpr),
+    b.x - a.x,
+    b.y - a.y,
+  );
+  ctx.restore();
+};
+
+/** The marquee being dragged on empty ground (screen 15). */
+export const drawMarquee = (
+  ctx: CanvasRenderingContext2D,
+  { camera, size }: Frame,
+  box: Box,
+) => {
+  const a = toScreen(camera, { x: box.x, y: box.y });
+  const b = toScreen(camera, { x: box.x + box.w, y: box.y + box.h });
+  ctx.fillStyle = "oklch(72% 0.17 45 / 0.08)";
+  ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = 1 / size.dpr;
+  ctx.strokeRect(
+    hairline(a.x, size.dpr),
+    hairline(a.y, size.dpr),
+    b.x - a.x,
+    b.y - a.y,
+  );
+};

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { arrow, rect } from "@/test/shapes";
-import { handleAt, reshape } from "./handles";
+import { handleAt, reshape, scaleInto } from "./handles";
 
 describe("handles", () => {
   it("are 8 screen px at any zoom", () => {
@@ -19,5 +19,21 @@ describe("handles", () => {
       x2: 400,
       y2: 250,
     });
+  });
+
+  it("a group resized as one carries each member with it: a box twice as big, twice as far", () => {
+    const from = { x: 100, y: 100, w: 200, h: 100 };
+    const to = { x: 100, y: 100, w: 400, h: 200 };
+    expect(
+      scaleInto(rect("r", { x: 200, y: 150, w: 50, h: 50 }), from, to),
+    ).toEqual({
+      x: 300,
+      y: 200,
+      w: 100,
+      h: 100,
+    });
+    expect(
+      scaleInto(arrow("a", { x1: 100, y1: 100, x2: 300, y2: 200 }), from, to),
+    ).toEqual({ x1: 100, y1: 100, x2: 500, y2: 300 });
   });
 });

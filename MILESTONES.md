@@ -27,14 +27,14 @@ decisions log.
 |                          | M12 — Highlight and the four-pass compositor | ✅ Done |
 |                          | M13 — Text that exports identically          | ✅ Done |
 |                          | M14 — Pixelate, kept live                    | ✅ Done |
-| E · The whole flow board | M15 — Layers and multi-select                | ⏭ Next  |
-|                          | M16 — Export, the whole dialog               |         |
+| E · The whole flow board | M15 — Layers and multi-select                | ✅ Done |
+|                          | M16 — Export, the whole dialog               | ⏭ Next  |
 |                          | M17 — Out of bounds                          |         |
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M14 — `pnpm check` green (format, typecheck, lint, 53 unit tests,
-build); `pnpm test:e2e` 88 passed (44 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M15 — `pnpm check` green (format, typecheck, lint, 56 unit tests,
+build); `pnpm test:e2e` 94 passed (47 checks, each at 2x and 1x).
 
 ---
 
@@ -350,8 +350,8 @@ Commit: `library: IndexedDB store keyed by image hash, with empty, loading and b
 - [x] Check (`e2e/routes.spec.ts` at 2x and 1x): screens 33 and 32 from their addresses; a box's
       address opened in a new tab has the same tool and the same box selected; the open page's
       and the editor's states from their parameters
-- [ ] Later: `format` and the export's `state` (M16), more than one id in `select` (M15).
-      (`zoom` and `at` arrived with M11, `edit` with M13.)
+- [ ] Later: `format` and the export's `state` (M16). (`zoom` and `at` arrived with M11, `edit`
+      with M13, several ids in `select` with M15.)
 
 Worth a look by eye:
 
@@ -435,3 +435,22 @@ Worth a look by eye:
 - [ ] Pixelate a face, export, and zoom into the PNG: the detail is gone, not blurred
 
 Commit: `pixelate: live redaction recomputed from source each render`
+
+## M15 — Layers and multi-select ✅
+
+- [x] The selection is a list: Shift-click adds or removes, `?select=` holds every id
+- [x] A marquee on empty ground with the select tool picks what it touches (screen 15)
+- [x] A group: the box around it with eight handles, members dashed, moved, resized and deleted
+      as one; the inspector's colour, X/Y/W/H and Delete N (screen 16)
+- [x] Paint order by dragging a layer row, ⌥↑/⌥↓, or Forward and Backward
+- [x] Check (`src/interact/machine.test.ts`, `src/geom/handles.test.ts`, `e2e/layers.spec.ts` at
+      2x and 1x): Shift adds and a drag moves the lot; a marquee is a drag on empty ground; a group
+      resize carries its members; three boxes marqueed, moved, and put back by one ⌘Z; a dragged row
+      changes which crossing frame is on top, and ⌥↓ steps it back; a hidden box is not in the PNG.
+      Proven by mutation: a move recorded per member, and an export with hidden layers, both fail
+
+Worth a look by eye:
+
+- [ ] Eight annotations list with image-px sizes that match the inspector's
+
+Commit: `layers: z-order list, visibility and marquee multi-select`

@@ -6,10 +6,10 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M14 of M0–M19 done: the MVP, the library, an address for every screen, and the
+**Status:** M0–M15 of M0–M19 done: the MVP, the library, an address for every screen, and the
 camera. Open an image, zoom to the pixel, draw boxes, arrows, highlights and labels, pixelate what
-must not show, undo, then Copy or export a PNG at the image's own size, the same bytes at any zoom.
-Layers and multi-select are next.
+must not show, select several and reorder layers, undo, then Copy or export a PNG at the image's own size, the
+same bytes at any zoom. The whole export page is next.
 See [MILESTONES.md](MILESTONES.md).
 
 ## Stack

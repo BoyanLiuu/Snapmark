@@ -69,3 +69,17 @@ export const hitTest = (doc: Doc, p: Point, scale: number): Id | null => {
     if (hits(all[i], p, tol)) return all[i].id;
   return null;
 };
+
+/** The annotations a marquee touches, by what they paint, in paint order (screen 15). */
+export const touching = (doc: Doc, box: Box): Id[] =>
+  annotations(doc)
+    .filter((a) => {
+      const b = bbox(a);
+      return (
+        b.x <= box.x + box.w &&
+        b.x + b.w >= box.x &&
+        b.y <= box.y + box.h &&
+        b.y + b.h >= box.y
+      );
+    })
+    .map((a) => a.id);

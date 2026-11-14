@@ -88,3 +88,17 @@ export const withAnnotation = (doc: Doc, a: Annotation): Doc => {
     order: doc.byId.has(a.id) ? doc.order : [...doc.order, a.id],
   };
 };
+
+/** Moves one annotation to `index` in the paint order (0 is the bottom), the rest keeping theirs. */
+export const reorder = (doc: Doc, id: Id, index: number): Doc => {
+  const from = doc.order.indexOf(id);
+  const to = Math.max(0, Math.min(doc.order.length - 1, index));
+  if (from < 0 || from === to) return doc;
+  const order = doc.order.filter((other) => other !== id);
+  order.splice(to, 0, id);
+  return { ...doc, order, editedAt: new Date() };
+};
+
+/** These annotations, those still in the document, in paint order. */
+export const inOrder = (doc: Doc, ids: readonly Id[]) =>
+  doc.order.filter((id) => ids.includes(id)).map((id) => doc.byId.get(id)!);

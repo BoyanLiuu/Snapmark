@@ -7,8 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { arrowLength } from "@/geom/arrow";
 import { defaultStroke } from "@/interact/draft";
-import { outline } from "@/model/bbox";
-import { KIND_LABEL } from "@/model/describe";
+import { outline, union, type Box } from "@/model/bbox";
+import { annotationCount, KIND_LABEL } from "@/model/describe";
 import { SWATCHES, type SwatchId } from "@/model/palette";
 import type { Annotation, PixelateA, TextA } from "@/model/types";
 
@@ -97,15 +97,109 @@ const factsOf = (a: Annotation): [string, string][][] => {
       ],
       [["Length", String(r(arrowLength(a)))]],
     ];
-  const box = outline(a);
-  return [
-    [
-      ["X", String(r(box.x))],
-      ["Y", String(r(box.y))],
-      ["W", String(r(box.w))],
-      ["H", String(r(box.h))],
-    ],
-  ];
+  return boxFacts(outline(a));
+};
+
+const Swatches = ({
+  value,
+  onChange,
+}: {
+  /** Empty when a group's colours differ. */
+  value: SwatchId | "";
+  onChange: (color: SwatchId) => void;
+}) => (
+  <div className="grid gap-2">
+    <span id="colour-label" className={labelClass}>
+      Colour
+    </span>
+    <ToggleGroup
+      type="single"
+      aria-labelledby="colour-label"
+      spacing={2}
+      value={value}
+      onValueChange={(next) => next && onChange(next as SwatchId)}
+      className="flex-wrap"
+    >
+      {SWATCHES.map(({ id, label }) => (
+        <ToggleGroupItem
+          key={id}
+          value={id}
+          aria-label={label}
+          className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
+        />
+      ))}
+    </ToggleGroup>
+  </div>
+);
+
+const Facts = ({ rows }: { rows: [string, string][][] }) =>
+  rows.map((row) => (
+    <dl
+      key={row[0][0]}
+      className={`grid border-t border-rule-2 pt-3 ${row.length === 4 ? "grid-cols-4" : "grid-cols-2"}`}
+    >
+      {row.map(([label, value]) => (
+        <div
+          key={label}
+          className="grid gap-1 border-r border-rule-2 px-2 first:pl-0 last:border-r-0"
+        >
+          <dt className="text-xs text-muted-foreground">{label}</dt>
+          <dd
+            data-testid={`fact-${label.toLowerCase()}`}
+            className="font-mono text-sm whitespace-nowrap text-foreground tabular-nums"
+          >
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  ));
+
+const boxFacts = (box: Box): [string, string][][] => [
+  [
+    ["X", String(r(box.x))],
+    ["Y", String(r(box.y))],
+    ["W", String(r(box.w))],
+    ["H", String(r(box.h))],
+  ],
+];
+
+/** Screen 16: several selected. One colour for all, the box around them, Delete. */
+const GroupInspector = ({
+  group,
+  onChange,
+  onDelete,
+}: {
+  group: Annotation[];
+  onChange: (patch: StylePatch) => void;
+  onDelete: () => void;
+}) => {
+  const colours = new Set(group.map((a) => a.color));
+  const [shared] = colours;
+  return (
+    <section
+      aria-labelledby="inspector-title"
+      className="grid gap-4 border-b p-6"
+    >
+      <h2
+        id="inspector-title"
+        className="text-[1.2rem] leading-[1.05] font-medium tracking-[-0.04em]"
+      >
+        {annotationCount(group.length)}
+      </h2>
+      <Swatches
+        value={colours.size === 1 ? shared : ""}
+        onChange={(color) => onChange({ color })}
+      />
+      <Facts rows={boxFacts(union(group.map(outline)))} />
+      <div>
+        <Button variant="outline" size="control" onClick={onDelete}>
+          <Trash2 />
+          Delete {group.length}
+        </Button>
+      </div>
+    </section>
+  );
 };
 
 /** What the inspector changes: the look, a label's size and plate, a region's block size. */
@@ -134,15 +228,31 @@ export const Inspector = ({
   onCommit,
   onDelete,
   onEditText,
+  steps,
+  onStep,
 }: {
-  subject: { naturalWidth: number } | { selected: Annotation };
+  subject:
+    | { naturalWidth: number }
+    | { selected: Annotation }
+    | { group: Annotation[] };
   style: Style;
   /** A slider drag calls this many times and `onCommit` once, when it lets go. */
   onChange: (patch: StylePatch) => void;
   onCommit: () => void;
   onDelete: () => void;
   onEditText: () => void;
+  /** Whether the one selected annotation can move up or down the paint order. */
+  steps: { up: boolean; down: boolean } | null;
+  onStep: (delta: 1 | -1) => void;
 }) => {
+  if ("group" in subject)
+    return (
+      <GroupInspector
+        group={subject.group}
+        onChange={onChange}
+        onDelete={onDelete}
+      />
+    );
   const selected = "selected" in subject ? subject.selected : null;
   const kind = selected?.kind;
   const hasColour = kind !== "pixelate";
@@ -162,30 +272,10 @@ export const Inspector = ({
       </h2>
 
       {hasColour && (
-        <div className="grid gap-2">
-          <span id="colour-label" className={labelClass}>
-            Colour
-          </span>
-          <ToggleGroup
-            type="single"
-            aria-labelledby="colour-label"
-            spacing={2}
-            value={style.color}
-            onValueChange={(value) =>
-              value && onChange({ color: value as SwatchId })
-            }
-            className="flex-wrap"
-          >
-            {SWATCHES.map(({ id, label }) => (
-              <ToggleGroupItem
-                key={id}
-                value={id}
-                aria-label={label}
-                className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
-              />
-            ))}
-          </ToggleGroup>
-        </div>
+        <Swatches
+          value={style.color}
+          onChange={(color) => onChange({ color })}
+        />
       )}
 
       {hasStroke && (
@@ -252,27 +342,7 @@ export const Inspector = ({
 
       {facts && (
         <>
-          {facts.map((row) => (
-            <dl
-              key={row[0][0]}
-              className={`grid border-t border-rule-2 pt-3 ${row.length === 4 ? "grid-cols-4" : "grid-cols-2"}`}
-            >
-              {row.map(([label, value]) => (
-                <div
-                  key={label}
-                  className="grid gap-1 border-r border-rule-2 px-2 first:pl-0 last:border-r-0"
-                >
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
-                  <dd
-                    data-testid={`fact-${label.toLowerCase()}`}
-                    className="font-mono text-sm whitespace-nowrap text-foreground tabular-nums"
-                  >
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          ))}
+          <Facts rows={facts} />
           <div className="flex flex-wrap gap-2">
             {selected?.kind === "text" && (
               <Button variant="outline" size="control" onClick={onEditText}>
@@ -283,8 +353,9 @@ export const Inspector = ({
             <Button
               variant="outline"
               size="control"
-              disabled
-              title="Z-order arrives in M15"
+              disabled={!steps?.up}
+              title="One step up the paint order (⌥↑)"
+              onClick={() => onStep(1)}
             >
               <ChevronUp />
               Forward
@@ -292,8 +363,9 @@ export const Inspector = ({
             <Button
               variant="outline"
               size="control"
-              disabled
-              title="Z-order arrives in M15"
+              disabled={!steps?.down}
+              title="One step down the paint order (⌥↓)"
+              onClick={() => onStep(-1)}
             >
               <ChevronDown />
               Backward

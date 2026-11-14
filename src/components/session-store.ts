@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { record, redo, seal, undo } from "@/history/undo";
 import { setQuery } from "@/lib/route";
 import { toggle } from "@/lib/set";
+import { reorder } from "@/model/doc";
 import { readStored } from "@/model/stored";
 import type { Doc, Id } from "@/model/types";
 import type { EditorSession } from "./editor/editor-shell";
@@ -21,7 +22,7 @@ interface SessionState {
   session: Session | null;
   /** The editor's tool and selection: one image's, set when it opens (from its address, M10). */
   tool: ToolId;
-  selectedId: Id | null;
+  selection: readonly Id[];
   actions: {
     /** One change, one undo entry; a `group` merges a run of changes (a slider drag) into one. */
     edit: (fn: (doc: Doc) => Doc, label: string, group?: string) => void;
@@ -29,8 +30,10 @@ interface SessionState {
     undo: () => void;
     redo: () => void;
     toggleHidden: (id: Id) => void;
+    /** The one selected annotation a step up (1) or down (-1) the paint order. */
+    step: (delta: 1 | -1) => void;
     setTool: (tool: ToolId) => void;
-    select: (id: Id | null) => void;
+    select: (ids: readonly Id[]) => void;
     /** Screen 11: read the stored annotations again, or carry on without them. */
     retry: () => Promise<void>;
     startFresh: () => void;
@@ -53,7 +56,7 @@ export const useSessionStore = create<SessionState>()((set, get) => {
   return {
     session: null,
     tool: "select",
-    selectedId: null,
+    selection: [],
     actions: {
       edit: (fn, label, group) =>
         onReady((s) => {
@@ -71,8 +74,17 @@ export const useSessionStore = create<SessionState>()((set, get) => {
       redo: () => onReady((s) => travel(s, redo(s.history, s.doc))),
       toggleHidden: (id) =>
         onReady((s) => ({ ...s, hidden: toggle(s.hidden, id) })),
+      step: (delta) => {
+        const { selection, actions } = get();
+        if (selection.length !== 1) return;
+        const [id] = selection;
+        actions.edit(
+          (doc) => reorder(doc, id, doc.order.indexOf(id) + delta),
+          "Reorder",
+        );
+      },
       setTool: (tool) => set({ tool }),
-      select: (selectedId) => set({ selectedId }),
+      select: (selection) => set({ selection }),
       retry: async () => {
         const { session } = get();
         if (session?.state !== "ready") return;

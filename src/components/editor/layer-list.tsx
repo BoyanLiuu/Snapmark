@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Eye, EyeOff, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -25,13 +26,15 @@ const Skeleton = () => (
 
 /**
  * The layers rail: one row per annotation, top of the paint order first, with its size in image
- * px. A row selects its annotation, as a click on the canvas does; the eye hides it from the canvas.
+ * px. A row selects its annotation, as a click on the canvas does, and Shift adds it to the
+ * selection; dragging a row changes what sits on top; the eye hides it from the canvas and export.
  */
 export const LayerList = ({
   layers,
   hidden,
-  selected,
+  selection,
   onSelect,
+  onReorder,
   onToggleHidden,
   unreadable = false,
 }: {
@@ -39,10 +42,18 @@ export const LayerList = ({
   layers: LayerRow[] | null;
   unreadable?: boolean;
   hidden: ReadonlySet<Id>;
-  selected: Id | null;
-  onSelect: (id: Id | null) => void;
+  selection: readonly Id[];
+  onSelect: (id: Id, additive: boolean) => void;
+  /** Moves an annotation to `index` in the paint order, 0 the bottom. */
+  onReorder: (id: Id, index: number) => void;
   onToggleHidden: (id: Id) => void;
 }) => {
+  const [dragging, setDragging] = useState<Id | null>(null);
+  const [over, setOver] = useState<number | null>(null);
+  const endDrag = () => {
+    setDragging(null);
+    setOver(null);
+  };
   return (
     <section aria-labelledby="layers-title" className="grid gap-4 border-b p-6">
       <div className="flex items-baseline justify-between gap-4">
@@ -72,23 +83,44 @@ export const LayerList = ({
         </p>
       )}
       <ol className="-mx-3">
-        {layers?.map(({ id, kind, name, dims }) => {
+        {layers?.map(({ id, kind, name, dims }, row) => {
           const Icon = KIND_ICON[kind];
-          const isSelected = selected === id;
+          const isSelected = selection.includes(id);
           const isHidden = hidden.has(id);
           return (
             <li
               key={id}
+              draggable
               data-selected={isSelected || undefined}
+              onDragStart={(event) => {
+                setDragging(id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", id);
+              }}
+              onDragOver={(event) => {
+                if (!dragging) return;
+                event.preventDefault();
+                if (over !== row) setOver(row);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                // Rows run top first; the paint order runs bottom first.
+                if (dragging) onReorder(dragging, layers.length - 1 - row);
+                endDrag();
+              }}
+              onDragEnd={endDrag}
               className={cn(
                 "relative grid grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-1 border-b border-rule-2 pl-1",
                 isSelected &&
                   "bg-paper-3 before:absolute before:top-1/2 before:-left-px before:size-1.5 before:-translate-y-1/2 before:bg-primary",
+                over === row &&
+                  dragging !== id &&
+                  "shadow-[inset_0_2px_0_var(--primary)]",
               )}
             >
               <span
                 aria-hidden
-                title="Reordering arrives in M15"
+                title="Drag to change what sits on top"
                 className="grid cursor-grab place-items-center text-muted-2"
               >
                 <GripVertical className="size-4 [stroke-width:2.5]" />
@@ -96,7 +128,9 @@ export const LayerList = ({
               <button
                 type="button"
                 aria-pressed={isSelected}
-                onClick={() => onSelect(isSelected ? null : id)}
+                onClick={(event) =>
+                  onSelect(id, event.shiftKey || event.metaKey)
+                }
                 className={cn(
                   "grid min-h-10 grid-cols-[16px_minmax(0,1fr)_auto] items-center gap-2 px-2 text-left text-sm whitespace-nowrap text-ink-2 outline-none hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
                   isSelected && "text-foreground",

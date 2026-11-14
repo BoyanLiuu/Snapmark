@@ -108,7 +108,7 @@ export const useSession = () => {
   const opening = (name: string, natural: Size | null, sample: boolean) => {
     flush();
     setRefusal(null);
-    useSessionStore.setState({ tool: "select", selectedId: null });
+    useSessionStore.setState({ tool: "select", selection: [] });
     setSession({ state: "decoding", key: null, name, natural, sample });
     return ++ticket.current;
   };
@@ -146,11 +146,11 @@ export const useSession = () => {
       return;
     }
     const { name, natural, sample } = image;
-    // The address's ?tool= and ?select=; M15 selects more than one.
+    // The address's ?tool= and ?select= (comma-separated ids).
     const route = parseRoute(window.location.hash);
     useSessionStore.setState({
       tool: forced(route, "tool", TOOL_IDS) ?? "select",
-      selectedId: route.query.get("select")?.split(",")[0] || null,
+      selection: (route.query.get("select") ?? "").split(",").filter(Boolean),
     });
     setSession({ state: "decoding", key, name, natural, sample });
     // ?state=loading holds the image at screen 08; ?state=error shows screen 11.

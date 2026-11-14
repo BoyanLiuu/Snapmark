@@ -9,10 +9,13 @@ import { MAX_SCALE, MIN_SCALE, type Zoom } from "@/geom/camera";
 import { defaultStroke, drawn, labelAt } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
 import { go, setQuery, type Route } from "@/lib/route";
+import { toggleIn } from "@/lib/set";
 import { createStore } from "@/lib/store";
 import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
+  inOrder,
+  reorder,
   removeAnnotations,
   translated,
   updateAnnotation,
@@ -60,6 +63,13 @@ export type EditorSession =
     };
 
 const NONE: ReadonlySet<Id> = new Set();
+
+/** What the inspector shows: the next annotation's look, one annotation, or a group. */
+const subjectOf = (members: Annotation[], naturalWidth: number) => {
+  if (members.length === 1) return { selected: members[0] };
+  if (members.length > 1) return { group: members };
+  return { naturalWidth };
+};
 
 type Writing = { id: Id } | { fresh: TextA };
 
@@ -113,7 +123,7 @@ export const EditorShell = ({
   onHome: () => void;
 }) => {
   const tool = useSessionStore((s) => s.tool);
-  const selectedId = useSessionStore((s) => s.selectedId);
+  const selection = useSessionStore((s) => s.selection);
   const actions = useSessionActions();
   const [zoom] = useState(() => zoomFrom(route));
   const [scale] = useState(() => createStore<number | null>(null));
@@ -145,7 +155,9 @@ export const EditorShell = ({
   const unreadable = ready?.unreadable ?? false;
   const doc = ready?.doc ?? null;
   const hidden = ready?.hidden ?? NONE;
-  const selected = (selectedId && doc?.byId.get(selectedId)) || null;
+  // The selection's annotations, in paint order; `selected` when there is exactly one.
+  const members = doc ? inOrder(doc, selection) : [];
+  const selected = members.length === 1 ? members[0] : null;
   const editingId = writing && "id" in writing ? writing.id : null;
   const writingText = labelOf(writing, doc);
   // A label being edited shows in its editor, not on the canvas under it.
@@ -174,19 +186,30 @@ export const EditorShell = ({
       const a = drawn(kind, from, to, style, newId(), naturalWidth);
       if (a.kind === "arrow" && degenerate(a)) return;
       edit((d) => addAnnotation(d, a), "Draw");
-      actions.select(a.id);
+      actions.select([a.id]);
     },
-    onMove: (id, dx, dy) =>
-      edit((d) => {
-        const a = d.byId.get(id);
-        return a ? updateAnnotation(d, id, translated(a, dx, dy)) : d;
-      }, "Move"),
-    onReshape: (id, patch) =>
-      edit((d) => updateAnnotation(d, id, patch), "Resize"),
+    onMove: (ids, dx, dy) =>
+      edit(
+        (d) =>
+          ids.reduce((next, id) => {
+            const a = next.byId.get(id);
+            return a ? updateAnnotation(next, id, translated(a, dx, dy)) : next;
+          }, d),
+        "Move",
+      ),
+    onReshape: (changes) =>
+      edit(
+        (d) =>
+          changes.reduce(
+            (next, { id, patch }) => updateAnnotation(next, id, patch),
+            d,
+          ),
+        "Resize",
+      ),
     onDelete: () => {
-      if (!selectedId) return;
-      edit((d) => removeAnnotations(d, new Set([selectedId])), "Delete");
-      actions.select(null);
+      if (members.length === 0) return;
+      edit((d) => removeAnnotations(d, new Set(selection)), "Delete");
+      actions.select([]);
     },
     onDrawBox: () => {
       actions.setTool("rect");
@@ -197,7 +220,7 @@ export const EditorShell = ({
         setWriting({ fresh: labelAt(at, natural.w, style, newId()) });
     },
     onEditText: (id) => {
-      actions.select(id);
+      actions.select([id]);
       setWriting({ id });
     },
   };
@@ -212,21 +235,27 @@ export const EditorShell = ({
     if (fresh) {
       if (!text) return;
       edit((d) => addAnnotation(d, { ...label, text }), "Write");
-      actions.select(label.id);
+      actions.select([label.id]);
       actions.setTool("select");
     } else if (!text) {
       edit((d) => removeAnnotations(d, new Set([label.id])), "Delete");
-      actions.select(null);
+      actions.select([]);
     } else if (text !== label.text)
       edit((d) => updateAnnotation(d, label.id, { text }), "Edit text");
   };
 
   const restyle = (patch: StylePatch) => {
-    if (!selected) return setDefaults((current) => ({ ...current, ...patch }));
+    if (members.length === 0)
+      return setDefaults((current) => ({ ...current, ...patch }));
     // A slider drag is one entry until it is let go; a colour pick or a switch is its own.
     const field = Object.keys(patch)[0];
-    const group = SLIDERS.has(field) ? `${field}:${selected.id}` : undefined;
-    edit((d) => updateAnnotation(d, selected.id, patch), "Restyle", group);
+    const ids = members.map((a) => a.id);
+    const group = SLIDERS.has(field) ? `${field}:${ids.join(",")}` : undefined;
+    edit(
+      (d) => ids.reduce((next, id) => updateAnnotation(next, id, patch), d),
+      "Restyle",
+      group,
+    );
   };
 
   const copying = useCopy(
@@ -249,15 +278,19 @@ export const EditorShell = ({
 
   // The tool and the selection live in the address, so a state can be copied out of it.
   const live = ready !== null;
-  const selection = selected?.id ?? null;
+  const selectParam = members.map((a) => a.id).join(",") || null;
   useEffect(() => {
     if (!live) return;
     setQuery({
       tool: tool === "select" ? null : tool,
-      select: selection,
+      select: selectParam,
       edit: editingId,
     });
-  }, [live, tool, selection, editingId]);
+  }, [live, tool, selectParam, editingId]);
+
+  /** Paint order: one annotation to `index`, 0 the bottom. */
+  const reorderTo = (id: Id, index: number) =>
+    edit((d) => reorder(d, id, index), "Reorder");
 
   const exportPage = () => {
     const clipboard = route.query.get("clipboard");
@@ -268,7 +301,17 @@ export const EditorShell = ({
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (isTyping(event.target) || !(event.metaKey || event.ctrlKey)) return;
+      if (isTyping(event.target)) return;
+      // ⌥↑ / ⌥↓: the one selected annotation a step up or down the paint order.
+      if (
+        event.altKey &&
+        (event.key === "ArrowUp" || event.key === "ArrowDown")
+      ) {
+        event.preventDefault();
+        actions.step(event.key === "ArrowUp" ? 1 : -1);
+        return;
+      }
+      if (!(event.metaKey || event.ctrlKey)) return;
       const z = event.key.toLowerCase() === "z";
       if (z && !event.shiftKey) actions.undo();
       else if ((z && event.shiftKey) || event.key.toLowerCase() === "y")
@@ -311,7 +354,7 @@ export const EditorShell = ({
             doc={shown}
             decoding={ready ? null : { name, natural }}
             tool={tool}
-            selected={selected?.id ?? null}
+            selection={selection}
             draft={draft}
             actions={stageActions}
             writing={
@@ -348,11 +391,7 @@ export const EditorShell = ({
           >
             {ready && !unreadable ? (
               <Inspector
-                subject={
-                  selected
-                    ? { selected }
-                    : { naturalWidth: ready.image.natural.w }
-                }
+                subject={subjectOf(members, ready.image.natural.w)}
                 style={selected ? styleOf(selected) : style}
                 onChange={restyle}
                 onCommit={actions.seal}
@@ -360,6 +399,15 @@ export const EditorShell = ({
                 onEditText={() =>
                   selected && stageActions.onEditText(selected.id)
                 }
+                steps={
+                  selected && doc
+                    ? {
+                        up: doc.order.at(-1) !== selected.id,
+                        down: doc.order[0] !== selected.id,
+                      }
+                    : null
+                }
+                onStep={actions.step}
               />
             ) : (
               <div className="min-h-12 border-b" />
@@ -368,8 +416,15 @@ export const EditorShell = ({
               layers={doc && !unreadable ? layerRows(doc) : null}
               unreadable={unreadable}
               hidden={hidden}
-              selected={selected?.id ?? null}
-              onSelect={actions.select}
+              selection={selection}
+              onSelect={(id, additive) => {
+                if (additive) actions.select(toggleIn(selection, id));
+                else
+                  actions.select(
+                    selection.length === 1 && selection[0] === id ? [] : [id],
+                  );
+              }}
+              onReorder={reorderTo}
               onToggleHidden={actions.toggleHidden}
             />
             <p className="mt-auto px-6 py-4 text-sm text-muted-foreground">

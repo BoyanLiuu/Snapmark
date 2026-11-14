@@ -18,7 +18,7 @@ export const openChart = async (page: Page, name = "test-chart.png") => {
 
 /** The layer list's count. */
 export const count = (page: Page) =>
-  page.getByRole("complementary").getByText(/^\d+ annotations?$/);
+  page.getByRole("region", { name: "Layers" }).getByText(/^\d+ annotations?$/);
 
 /** Where the base canvas painted a colour: the centre of its pixels, in device px. */
 export const findPainted = (

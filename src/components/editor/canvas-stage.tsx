@@ -12,12 +12,20 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import type { Zoom } from "@/geom/camera";
-import { hitTest } from "@/geom/hit";
 import { toImage } from "@/geom/matrix";
-import { CURSOR, handleAt, handlesOf } from "@/geom/handles";
 import {
+  boxHandles,
+  CURSOR,
+  groupHandleAt,
+  handleAt,
+  handlesOf,
+} from "@/geom/handles";
+import { hitTest, touching } from "@/geom/hit";
+import {
+  between,
   IDLE,
   isDrawTool,
+  type Change,
   move,
   press,
   preview,
@@ -32,12 +40,19 @@ import { createStore, type Store } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { isTyping } from "@/lib/typing";
 import { useRefValue } from "@/lib/use-ref-value";
-import { outline } from "@/model/bbox";
+import { outline, union, type Box } from "@/model/bbox";
 import { tagOf } from "@/model/describe";
+import { sizeText } from "@/lib/text";
+import { inOrder } from "@/model/doc";
 import type { LoadedImage } from "@/model/image";
 import type { Annotation, Doc, Id, Point, Size, TextA } from "@/model/types";
 import { drawImageLayer } from "@/render/image";
-import { drawOverlay, drawSelection } from "@/render/overlay";
+import {
+  drawMarquee,
+  drawMember,
+  drawOverlay,
+  drawSelection,
+} from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
 import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
@@ -46,6 +61,10 @@ import { useCamera, type StageCamera } from "./use-camera";
 import type { Notice } from "./use-copy";
 
 const POINTER_OFF = "Pointer off";
+
+/** A group's tag: the size of the box around it, in image px. */
+const sizeOf = (box: Box) =>
+  sizeText({ w: Math.round(box.w), h: Math.round(box.h) });
 
 /** Floor, not round: the pixel whose square contains the pointer. */
 const cursorText = ({ x, y }: Point) =>
@@ -116,10 +135,10 @@ export interface Writing {
 }
 
 export interface StageActions {
-  onSelect: (id: Id | null) => void;
+  onSelect: (ids: Id[]) => void;
   onDraw: (tool: DrawTool, from: Point, to: Point) => void;
-  onMove: (id: Id, dx: number, dy: number) => void;
-  onReshape: (id: Id, patch: Partial<Annotation>) => void;
+  onMove: (ids: Id[], dx: number, dy: number) => void;
+  onReshape: (changes: Change[]) => void;
   onDelete: () => void;
   onDrawBox: () => void;
   /** The text tool pressed on empty ground. */
@@ -140,7 +159,7 @@ export const CanvasStage = ({
   doc,
   decoding,
   tool,
-  selected,
+  selection,
   draft,
   actions,
   zoom,
@@ -156,7 +175,7 @@ export const CanvasStage = ({
   doc: Doc | null;
   decoding: { name: string; natural: Size | null } | null;
   tool: ToolId;
-  selected: Id | null;
+  selection: readonly Id[];
   draft: (tool: DrawTool, from: Point, to: Point) => Annotation;
   actions: StageActions;
   /** Where the view starts: fitted, or the address's `?zoom=&at=`. */
@@ -182,7 +201,8 @@ export const CanvasStage = ({
   const imageRef = useRefValue(image);
   const docRef = useRefValue(doc);
   const toolRef = useRefValue(tool);
-  const selectedRef = useRefValue(selected);
+  const selectionRef = useRefValue(selection);
+  const selected = (shown: Doc) => inOrder(shown, selectionRef.current);
   const draftRef = useRefValue(draft);
   const actionsRef = useRefValue(actions);
   const panRef = useRef<Point | null>(null);
@@ -222,15 +242,33 @@ export const CanvasStage = ({
       drawOverlay: (ctx, frame) => {
         drawOverlay(ctx, frame, pointerRef.current);
         const shown = scene();
-        const id = selectedRef.current;
-        const a =
-          id && shown?.order.includes(id) ? shown.byId.get(id) : undefined;
-        if (a)
+        if (!shown) return;
+        const gesture = gestureRef.current;
+        if (gesture.kind === "marquee") {
+          const box = between(gesture.from, gesture.to);
+          drawMarquee(ctx, frame, box);
+          // What the marquee would select, as the members of a selection are drawn.
+          for (const id of touching(shown, box))
+            drawMember(ctx, frame, outline(shown.byId.get(id)!));
+          return;
+        }
+        const members = selected(shown);
+        if (members.length === 1) {
+          const [a] = members;
           drawSelection(ctx, frame, {
             box: a.kind === "arrow" ? null : outline(a),
             handles: handlesOf(a).map(([, p]) => p),
             tag: tagOf(a),
           });
+        } else if (members.length > 1) {
+          const box = union(members.map(outline));
+          for (const a of members) drawMember(ctx, frame, outline(a));
+          drawSelection(ctx, frame, {
+            box,
+            handles: boxHandles(box).map(([, p]) => p),
+            tag: sizeOf(box),
+          });
+        }
       },
       // React only hears about frames when the debug readout is showing.
       onFrame: (next) => {
@@ -267,7 +305,7 @@ export const CanvasStage = ({
   const writingText = writing?.annotation;
   useEffect(() => {
     viewRef.current?.invalidate("overlay");
-  }, [selected, writingText]);
+  }, [selection, writingText]);
 
   useEffect(() => {
     // Draw one frame so the readout has numbers as soon as it appears.
@@ -294,13 +332,18 @@ export const CanvasStage = ({
   const apply = (effects: Effect[]) => {
     const act = actionsRef.current;
     for (const effect of effects) {
-      if (effect.kind === "select") act.onSelect(effect.id);
+      if (effect.kind === "select") act.onSelect(effect.ids);
       else if (effect.kind === "draw")
         act.onDraw(effect.tool, effect.from, effect.to);
-      else if (effect.kind === "reshape")
-        act.onReshape(effect.id, effect.patch);
+      else if (effect.kind === "reshape") act.onReshape(effect.changes);
       else if (effect.kind === "write") act.onWrite(effect.at);
-      else act.onMove(effect.id, effect.dx, effect.dy);
+      else if (effect.kind === "marquee") {
+        const shown = docRef.current;
+        if (shown)
+          act.onSelect([
+            ...new Set([...effect.base, ...touching(shown, effect.box)]),
+          ]);
+      } else act.onMove(effect.ids, effect.dx, effect.dy);
     }
   };
 
@@ -312,14 +355,21 @@ export const CanvasStage = ({
     if (changed) viewRef.current?.invalidate("base");
   };
 
-  /** The selected shape's handle under the pointer, if it has handles. */
+  /** The selection's handle under the pointer: one shape's own, or a group's box. */
   const grabbed = (at: PointerAt) => {
-    const id = selectedRef.current;
-    const a = id ? docRef.current?.byId.get(id) : undefined;
+    const shown = docRef.current;
     const view = viewRef.current;
-    if (!a || !view) return undefined;
-    const handle = handleAt(a, at.image, view.camera().scale);
-    return handle ? { annotation: a, handle } : undefined;
+    if (!shown || !view) return undefined;
+    const members = selected(shown);
+    const scale = view.camera().scale;
+    if (members.length === 1) {
+      const handle = handleAt(members[0], at.image, scale);
+      return handle ? { start: members, box: null, handle } : undefined;
+    }
+    if (members.length === 0) return undefined;
+    const box = union(members.map(outline));
+    const handle = groupHandleAt(box, at.image, scale);
+    return handle ? { start: members, box, handle } : undefined;
   };
 
   const hitAt = (at: PointerAt) => {
@@ -361,7 +411,13 @@ export const CanvasStage = ({
     event.currentTarget.setPointerCapture(event.pointerId);
     const grab = grabbed(at);
     const hit = grab ? null : hitAt(at);
-    const [gesture, effects] = press(toolRef.current, hit, at, grab);
+    const [gesture, effects] = press(
+      toolRef.current,
+      hit,
+      at,
+      selectionRef.current,
+      grab,
+    );
     gestureRef.current = gesture;
     apply(effects);
   };
@@ -446,10 +502,10 @@ export const CanvasStage = ({
       if (isTyping(event.target)) return;
       if (event.key === "Escape") {
         if (gestureRef.current.kind !== "idle") cancel();
-        else actionsRef.current.onSelect(null);
+        else actionsRef.current.onSelect([]);
       } else if (
         (event.key === "Delete" || event.key === "Backspace") &&
-        selectedRef.current &&
+        selectionRef.current.length > 0 &&
         gestureRef.current.kind === "idle"
       ) {
         event.preventDefault();
