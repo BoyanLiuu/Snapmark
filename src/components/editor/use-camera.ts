@@ -24,6 +24,8 @@ export interface StageCamera {
 }
 
 const SETTLE_DELAY = 200;
+/** One step of the zoom buttons and of + and −. */
+export const ZOOM_STEP = 1.25;
 /** Zoom per unit of wheel delta: a pinch's deltas are small, a wheel notch's large. */
 const PINCH_RATE = 0.01;
 const WHEEL_RATE = 0.0015;

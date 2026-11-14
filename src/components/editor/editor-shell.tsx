@@ -11,14 +11,14 @@ import type { DrawTool } from "@/interact/machine";
 import { go, setQuery, type Route } from "@/lib/route";
 import { toggleIn } from "@/lib/set";
 import { createStore } from "@/lib/store";
-import { isTyping } from "@/lib/typing";
+import { useRefValue } from "@/lib/use-ref-value";
 import {
   addAnnotation,
   annotations,
   inOrder,
+  moved,
   reorder,
   removeAnnotations,
-  translated,
   updateAnnotation,
   withoutIds,
 } from "@/model/doc";
@@ -40,6 +40,7 @@ import { Unreadable } from "./unreadable";
 import type { StageCamera } from "./use-camera";
 import { useCopy, type Notice } from "./use-copy";
 import { useJsonImport } from "./use-json-import";
+import { useShortcuts } from "./use-shortcuts";
 
 /** An open image: decoding (screen 08), or ready with its document and its history. */
 export type EditorSession =
@@ -132,11 +133,15 @@ export const EditorShell = ({
   const [zoom] = useState(() => zoomFrom(route));
   const [scale] = useState(() => createStore<number | null>(null));
   const stage = useRef<StageCamera>(null);
-  const camera: StageCamera = {
-    zoomBy: (k) => stage.current?.zoomBy(k),
-    fit: () => stage.current?.fit(),
-    actualSize: () => stage.current?.actualSize(),
-  };
+  // Stable, so the shortcuts' listener is added once.
+  const camera = useMemo<StageCamera>(
+    () => ({
+      zoomBy: (k) => stage.current?.zoomBy(k),
+      fit: () => stage.current?.fit(),
+      actualSize: () => stage.current?.actualSize(),
+    }),
+    [],
+  );
   const [notice, setNotice] = useState<Notice | null>(null);
   // The label open in its editor: one in the document, or a new one not yet in it (?edit=, M13).
   const [writing, setWriting] = useState<Writing | null>(() => {
@@ -195,15 +200,7 @@ export const EditorShell = ({
       edit((d) => addAnnotation(d, a), "Draw");
       actions.select([a.id]);
     },
-    onMove: (ids, dx, dy) =>
-      edit(
-        (d) =>
-          ids.reduce((next, id) => {
-            const a = next.byId.get(id);
-            return a ? updateAnnotation(next, id, translated(a, dx, dy)) : next;
-          }, d),
-        "Move",
-      ),
+    onMove: (ids, dx, dy) => edit((d) => moved(d, ids, dx, dy), "Move"),
     onReshape: (changes) =>
       edit(
         (d) =>
@@ -308,29 +305,8 @@ export const EditorShell = ({
     );
   };
 
-  useEffect(() => {
-    const key = (event: KeyboardEvent) => {
-      if (isTyping(event.target)) return;
-      // ⌥↑ / ⌥↓: the one selected annotation a step up or down the paint order.
-      if (
-        event.altKey &&
-        (event.key === "ArrowUp" || event.key === "ArrowDown")
-      ) {
-        event.preventDefault();
-        actions.step(event.key === "ArrowUp" ? 1 : -1);
-        return;
-      }
-      if (!(event.metaKey || event.ctrlKey)) return;
-      const z = event.key.toLowerCase() === "z";
-      if (z && !event.shiftKey) actions.undo();
-      else if ((z && event.shiftKey) || event.key.toLowerCase() === "y")
-        actions.redo();
-      else return;
-      event.preventDefault();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [actions]);
+  const copyRef = useRefValue(ready ? copying : null);
+  useShortcuts(camera, copyRef);
 
   return (
     <div className="flex h-dvh min-h-[560px] flex-col">

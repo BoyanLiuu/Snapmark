@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { Store } from "@/lib/store";
 import { nbsp } from "@/lib/text";
-import type { StageCamera } from "./use-camera";
+import { ZOOM_STEP, type StageCamera } from "./use-camera";
 import { TOOLS, type ToolId } from "./tools";
 import type { Copying } from "./use-copy";
-
-const ZOOM_STEP = 1.25;
 
 /** "400% · 3840 × 2407": the percentage never stands alone, so it can't be misread. */
 const ZoomReadout = ({

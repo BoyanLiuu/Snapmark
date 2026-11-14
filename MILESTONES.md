@@ -30,11 +30,11 @@ decisions log.
 | E · The whole flow board | M15 — Layers and multi-select                | ✅ Done |
 |                          | M16 — Export, the whole dialog               | ✅ Done |
 |                          | M17 — Out of bounds                          | ✅ Done |
-|                          | M18 — Shortcuts and keyboard                 | ⏭ Next  |
-|                          | M19 — The phone                              |         |
+|                          | M18 — Shortcuts and keyboard                 | ✅ Done |
+|                          | M19 — The phone                              | ⏭ Next  |
 
-**Last verified:** 2026-11-14, M17 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
-build); `pnpm test:e2e` 102 passed (51 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M18 — `pnpm check` green (format, typecheck, lint, 58 unit tests,
+build); `pnpm test:e2e` 108 passed (54 checks, each at 2x and 1x).
 
 ---
 
@@ -488,3 +488,14 @@ Worth a look by eye:
 - [ ] Export with an arrow half outside: the PNG is the image's size, the arrow cut at the edge
 
 Commit: `bounds: out-of-bounds gutter and badge`
+
+## M18 — Shortcuts and keyboard ✅
+
+- [x] The shortcuts panel (screen 24), from the app bar's Shortcuts on the open page and the editor
+- [x] V R A H T P; ⌘Z / ⇧⌘Z; ⌘C; Delete; Esc; Space-pan; ⌥↑ / ⌥↓; ⇧1 / ⇧0; + / −; arrow-key nudges
+- [x] None of them fire while typing in a field or the label editor, or in a dialog
+- [x] Check (`e2e/shortcuts.spec.ts` at 2x and 1x): the panel opens on both pages and closes with
+      Close or Esc; every row is pressed and does what it says, nudges undone in one step; typing
+      "rav" in a label types it. Proven by mutation: without the typing guard, the label check fails
+
+Commit: `keyboard: shortcut map and the shortcuts panel`

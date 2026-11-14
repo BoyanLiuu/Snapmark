@@ -102,3 +102,10 @@ export const reorder = (doc: Doc, id: Id, index: number): Doc => {
 /** These annotations, those still in the document, in paint order. */
 export const inOrder = (doc: Doc, ids: readonly Id[]) =>
   doc.order.filter((id) => ids.includes(id)).map((id) => doc.byId.get(id)!);
+
+/** These annotations moved by `dx`, `dy` image px, as one change. */
+export const moved = (doc: Doc, ids: readonly Id[], dx: number, dy: number) =>
+  ids.reduce((next, id) => {
+    const a = next.byId.get(id);
+    return a ? updateAnnotation(next, id, translated(a, dx, dy)) : next;
+  }, doc);

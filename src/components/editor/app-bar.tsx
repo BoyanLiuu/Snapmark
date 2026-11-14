@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Shortcuts } from "./shortcuts";
 import { Mark } from "./tools";
 
 /**
@@ -13,6 +17,7 @@ export const AppBar = ({
   variant: "public" | "app" | "bare";
   onHome?: () => void;
 }) => {
+  const [shortcuts, setShortcuts] = useState(false);
   const home = (event: React.MouseEvent) => {
     if (!onHome) return;
     event.preventDefault();
@@ -45,10 +50,11 @@ export const AppBar = ({
           <Button
             variant="outline"
             size="control"
-            title="The shortcuts panel arrives in M18"
+            onClick={() => setShortcuts(true)}
           >
             Shortcuts
           </Button>
+          <Shortcuts open={shortcuts} onOpenChange={setShortcuts} />
         </div>
       )}
     </header>
