@@ -8,6 +8,7 @@ import {
   type ClipboardSupport,
 } from "@/export/clipboard";
 import { pngName } from "@/export/render";
+import { forced, type Route } from "@/lib/route";
 
 export interface Notice {
   text: string;
@@ -32,9 +33,16 @@ export const useCopy = (
   png: () => Promise<Blob>,
   { name, size }: { name: string; size: string },
   onNotice: (notice: Notice) => void,
+  route: Route,
 ) => {
-  const [support] = useState(clipboardSupport);
-  const [blocked, setBlocked] = useState(false);
+  // ?clipboard=none or denied: screens 22 and 23 without the browser that causes them.
+  const [clipboard] = useState(() =>
+    forced(route, "clipboard", ["none", "denied"]),
+  );
+  const [support] = useState<ClipboardSupport>(() =>
+    clipboard === "none" ? "insecure" : clipboardSupport(),
+  );
+  const [blocked, setBlocked] = useState(clipboard === "denied");
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const downloads = support !== "ok" || blocked;
@@ -77,7 +85,7 @@ export const useCopy = (
   if (support !== "ok") reason = WHY[support];
   else if (blocked) reason = BLOCKED;
 
-  return { copied, reason, downloads, copy, download };
+  return { copied, blocked, reason, downloads, copy, download };
 };
 
 export type Copying = ReturnType<typeof useCopy>;

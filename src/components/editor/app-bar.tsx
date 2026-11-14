@@ -9,7 +9,8 @@ export const AppBar = ({
   variant,
   onHome,
 }: {
-  variant: "public" | "app";
+  /** `bare` is the wordmark alone, for the dead ends (screens 32, 33). */
+  variant: "public" | "app" | "bare";
   onHome?: () => void;
 }) => {
   const home = (event: React.MouseEvent) => {
@@ -39,15 +40,17 @@ export const AppBar = ({
           </a>
         </nav>
       )}
-      <div className="ml-auto flex items-center gap-3">
-        <Button
-          variant="outline"
-          size="control"
-          title="The shortcuts panel arrives in M18"
-        >
-          Shortcuts
-        </Button>
-      </div>
+      {variant !== "bare" && (
+        <div className="ml-auto flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="control"
+            title="The shortcuts panel arrives in M18"
+          >
+            Shortcuts
+          </Button>
+        </div>
+      )}
     </header>
   );
 };

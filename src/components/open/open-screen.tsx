@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { LoadedImage } from "@/model/image";
+import { forced, type Route } from "@/lib/route";
+import { refusalOf, type LoadedImage } from "@/model/image";
 import { loadSample } from "@/model/sample";
 import { AppBar } from "../editor/app-bar";
 import { Kbd } from "../editor/kbd";
@@ -18,10 +19,12 @@ import { useImageInput } from "./use-image-input";
  * line (screen 03).
  */
 export const OpenScreen = ({
+  route,
   refusal,
   onFile,
   onSample,
 }: {
+  route: Route;
   /** Why the last file couldn't be opened, or null. */
   refusal: string | null;
   onFile: (file: File) => void;
@@ -53,6 +56,13 @@ export const OpenScreen = ({
   }, [refusal]);
 
   const dragging = useImageInput(onFile);
+  // ?drop=heic shows screen 03 as if one had been dropped; ?state=… forces the list's states.
+  const shownRefusal =
+    refusal ??
+    (route.query.get("drop") === "heic"
+      ? refusalOf("IMG_4021.HEIC", "heic")
+      : null);
+  const listing = forced(route, "state", ["loading", "empty", "error"]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -98,10 +108,10 @@ export const OpenScreen = ({
                 data-testid="open-help"
                 className={cn(
                   "min-h-lh max-w-[34ch] text-sm text-muted-foreground",
-                  refusal && "text-destructive",
+                  shownRefusal && "text-destructive",
                 )}
               >
-                {refusal ?? (
+                {shownRefusal ?? (
                   <>
                     PNG, JPEG or WebP, kept on this device and never uploaded.
                     Paste with <Kbd>⌘&nbsp;V</Kbd>, or drop a file anywhere
@@ -113,7 +123,11 @@ export const OpenScreen = ({
             <Hero image={hero} onOpenSample={onSample} />
           </div>
         </div>
-        <Library onChoose={() => pickerRef.current?.click()} />
+        <Library
+          key={listing ?? "stored"}
+          forced={listing}
+          onChoose={() => pickerRef.current?.click()}
+        />
       </main>
       <footer className="border-t px-16 py-6 max-[60rem]:px-6 max-[40rem]:px-4">
         <SampleCredit className="text-xs text-muted-foreground" />

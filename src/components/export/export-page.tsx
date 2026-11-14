@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { renderPng } from "@/export/render";
-import { go } from "@/lib/route";
+import { go, type Route } from "@/lib/route";
 import { nbsp, sizeText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 import { withoutIds } from "@/model/doc";
@@ -30,9 +30,11 @@ const FORMATS = [
  * size. The preview is that PNG, scaled by the page; JPEG, JSON and the 64 MP budget arrive in M16.
  */
 export const ExportPage = ({
+  route,
   session,
   onHome,
 }: {
+  route: Route;
   session: EditorSession;
   onHome: () => void;
 }) => {
@@ -76,6 +78,7 @@ export const ExportPage = ({
     () => png ?? Promise.reject(new Error("the image is still opening.")),
     { name, size },
     setNotice,
+    route,
   );
   const back = () => go(`#/annotate/${session.key}`);
 

@@ -1,31 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { count, drawBox, openChart } from "./helpers";
+import { count, drawBox, openChart, stored } from "./helpers";
 
 /** M9: images and their annotations kept in this browser, filed under the hash of their bytes. */
-
-/** What IndexedDB holds: how many images, and each document's annotation count. */
-const stored = (page: Page) =>
-  page.evaluate(
-    () =>
-      new Promise<{ images: number; docs: number[] }>((resolve, reject) => {
-        const open = indexedDB.open("snapmark");
-        open.onerror = () => reject(open.error);
-        open.onsuccess = () => {
-          const db = open.result;
-          const tx = db.transaction(["images", "docs"]);
-          const images = tx.objectStore("images").count();
-          const docs = tx.objectStore("docs").getAll();
-          tx.oncomplete = () => {
-            db.close();
-            resolve({
-              images: images.result,
-              docs: docs.result.map((d) => d.annotations.length),
-            });
-          };
-        };
-      }),
-  );
 
 const toImages = (page: Page) =>
   page.getByRole("link", { name: "Images" }).click();
@@ -53,10 +30,12 @@ test("the same bytes under another name open the same record", async ({
   await openChart(page, "first.png");
   await drawBox(page);
   await expect.poll(() => stored(page)).toEqual({ images: 1, docs: [1] });
-  const address = page.url();
+  // The image's address, without the state that rides along in its query.
+  const imageAddress = () => page.url().split("?")[0];
+  const address = imageAddress();
   await openChart(page, "second.png");
   await expect(count(page)).toHaveText("1 annotation");
-  expect(page.url()).toBe(address);
+  expect(imageAddress()).toBe(address);
 });
 
 test("with storage blocked, an image still opens and the list says why it's empty", async ({

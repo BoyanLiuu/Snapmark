@@ -11,7 +11,14 @@ import {
 import { EMPTY_HISTORY, record, redo, seal, undo } from "@/history/undo";
 import { toggle } from "@/lib/set";
 import { debounced } from "@/lib/debounce";
-import { go, parseRoute, useRoute } from "@/lib/route";
+import {
+  forced,
+  go,
+  imageKey,
+  parseRoute,
+  setQuery,
+  useRoute,
+} from "@/lib/route";
 import { createDoc } from "@/model/doc";
 import { hashBlob, shortKey } from "@/model/hash";
 import { checkFormat, decodeImage } from "@/model/image";
@@ -95,15 +102,16 @@ export const useSession = () => {
   );
   const flush = saver.flush;
 
+  /** `known`: an image found by its address, with its hash, and whether the address forces screen 11. */
   const load = async (
     mine: number,
     blob: Blob,
     name: string,
     sample: boolean,
-    known?: string,
+    known?: { hash: string; unreadable: boolean },
   ) => {
     const live = () => ticket.current === mine;
-    const hash = known ?? (await hashBlob(blob));
+    const hash = known?.hash ?? (await hashBlob(blob));
     if (!live()) return;
     const key = shortKey(hash);
     liveKey.current = key;
@@ -123,7 +131,7 @@ export const useSession = () => {
     }
     const { image } = opened;
     const fresh = sample ? SAMPLE_DOC : createDoc(image.natural);
-    const { doc, unreadable } = await storedDoc(hash, image.natural, fresh);
+    const stored = await storedDoc(hash, image.natural, fresh);
     if (!live()) {
       image.bitmap.close();
       return;
@@ -133,11 +141,11 @@ export const useSession = () => {
       key,
       hash,
       image,
-      doc,
+      doc: stored.doc,
       history: EMPTY_HISTORY,
       hidden: NONE,
       sample,
-      unreadable,
+      unreadable: stored.unreadable || (known?.unreadable ?? false),
     });
     if (!known)
       makeThumb(image.bitmap)
@@ -196,7 +204,16 @@ export const useSession = () => {
     }
     const { name, natural, sample } = image;
     setSession({ state: "decoding", key, name, natural, sample });
-    load(mine, image.blob, name, sample, image.hash);
+    // ?state=loading holds the image at screen 08; ?state=error shows screen 11.
+    const state = forced(parseRoute(window.location.hash), "state", [
+      "loading",
+      "error",
+    ]);
+    if (state === "loading") return;
+    load(mine, image.blob, name, sample, {
+      hash: image.hash,
+      unreadable: state === "error",
+    });
   };
 
   const close = () => {
@@ -218,20 +235,23 @@ export const useSession = () => {
   const recovery = {
     retry: async () => {
       if (session?.state !== "ready") return;
+      setQuery({ state: null });
       const { hash, image, doc } = session;
       const read = await storedDoc(hash, image.natural, doc);
       setSession((s) =>
         s?.state === "ready" && s.hash === hash ? { ...s, ...read } : s,
       );
     },
-    startFresh: () =>
+    startFresh: () => {
+      setQuery({ state: null });
       setSession((s) =>
         s?.state === "ready" ? { ...s, unreadable: false } : s,
-      ),
+      );
+    },
   };
 
   // The address changed: back, forward, a link or a reload.
-  const routeKey = route.page === "open" ? null : route.key;
+  const routeKey = imageKey(route);
   useEffect(() => {
     if (routeKey === null) {
       if (liveKey.current) close();

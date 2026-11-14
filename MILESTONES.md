@@ -22,8 +22,8 @@ decisions log.
 |                          | M7 — Arrow, inspector, undo                  | ✅ Done |
 |                          | M8 — Export and Copy · **MVP**               | ✅ Done |
 | C · Kept and addressable | M9 — The library in this browser             | ✅ Done |
-|                          | M10 — Routes and dead ends                   | ⏭ Next  |
-| D · The learning goals   | M11 — The camera, zoom does not leak         |         |
+|                          | M10 — Routes and dead ends                   | ✅ Done |
+| D · The learning goals   | M11 — The camera, zoom does not leak         | ⏭ Next  |
 |                          | M12 — Highlight and the four-pass compositor |         |
 |                          | M13 — Text that exports identically          |         |
 |                          | M14 — Pixelate, kept live                    |         |
@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-14, M8 and M9 — `pnpm check` green (format, typecheck, lint, 49 unit tests,
-build); `pnpm test:e2e` 64 passed (32 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M10 — `pnpm check` green (format, typecheck, lint, 49 unit tests,
+build); `pnpm test:e2e` 72 passed (36 checks, each at 2x and 1x).
 
 ---
 
@@ -337,3 +337,24 @@ Worth a look by eye:
 - [ ] Open the app in a private window: the list explains itself, images still open
 
 Commit: `library: IndexedDB store keyed by image hash, with empty, loading and blocked states`
+
+## M10 — Routes and dead ends ✅
+
+- [x] `lib/route.ts`: the page in the path, the state in the query; `/annotate/` with anything but
+      a 12-digit key is screen 32, any other unknown path screen 33 (both with the bare app bar)
+- [x] Read when an address opens: `?state=loading|empty|error` and `?drop=heic` on the open page
+      (04–06, 03); `?state=loading|error`, `?tool=`, `?select=` and `?clipboard=none|denied` in the
+      editor (08, 11, 12, 13, 22, 23); `?clipboard=` on the export page
+- [x] The tool and the selection write back to the address without a history entry
+- [x] While Copy is a download, the status strip says why from the start (22, 23)
+- [x] Check (`e2e/routes.spec.ts` at 2x and 1x): screens 33 and 32 from their addresses; a box's
+      address opened in a new tab has the same tool and the same box selected; the open page's
+      and the editor's states from their parameters
+- [ ] Later: `edit` (M13), `zoom` and `at` (M11), `format` and the export's `state` (M16), more
+      than one id in `select` (M15)
+
+Worth a look by eye:
+
+- [ ] Select a box, copy the address, open it in another tab
+
+Commit: `routing: addressable states for every screen`

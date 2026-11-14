@@ -89,3 +89,26 @@ export const drawBox = async (page: Page) => {
 /** A box's X, Y, W or H in the inspector. */
 export const fact = async (page: Page, name: string) =>
   Number(await page.getByTestId(`fact-${name}`).textContent());
+
+/** What IndexedDB holds: how many images, and each document's annotation count. */
+export const stored = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<{ images: number; docs: number[] }>((resolve, reject) => {
+        const open = indexedDB.open("snapmark");
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(["images", "docs"]);
+          const images = tx.objectStore("images").count();
+          const docs = tx.objectStore("docs").getAll();
+          tx.oncomplete = () => {
+            db.close();
+            resolve({
+              images: images.result,
+              docs: docs.result.map((d) => d.annotations.length),
+            });
+          };
+        };
+      }),
+  );

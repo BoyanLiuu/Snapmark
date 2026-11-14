@@ -7,7 +7,7 @@ import type { History } from "@/history/undo";
 import { renderPng } from "@/export/render";
 import { drawn } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
-import { go } from "@/lib/route";
+import { forced, go, setQuery, type Route } from "@/lib/route";
 import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
@@ -29,7 +29,7 @@ import { layerRows } from "./layers";
 import { statusLine } from "./status";
 import { Unreadable } from "./unreadable";
 import { useCopy, type Notice } from "./use-copy";
-import type { ToolId } from "./tools";
+import { TOOL_IDS, type ToolId } from "./tools";
 
 /** An open image: decoding (screen 08), or ready with its document and its history. */
 export type EditorSession =
@@ -86,19 +86,26 @@ const styleOf = (a: Annotation): Style => ({
  * inspector above the layers, through every state from decoding (08) to a shape selected (13, 20).
  */
 export const EditorShell = ({
+  route,
   session,
   editing,
   recovery,
   onHome,
 }: {
+  route: Route;
   session: EditorSession;
   editing: Editing;
   recovery: { retry: () => void; startFresh: () => void };
   onHome: () => void;
 }) => {
-  const [tool, setTool] = useState<ToolId>("select");
+  // The address's ?tool= and ?select= on opening; M15 selects more than one.
+  const [tool, setTool] = useState<ToolId>(
+    () => forced(route, "tool", TOOL_IDS) ?? "select",
+  );
+  const [selectedId, setSelectedId] = useState<Id | null>(
+    () => route.query.get("select")?.split(",")[0] || null,
+  );
   const [zoom, setZoom] = useState<number | null>(null);
-  const [selectedId, setSelectedId] = useState<Id | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   // The stroke follows the image's width until it is set by hand.
   const [defaults, setDefaults] = useState<
@@ -175,7 +182,31 @@ export const EditorShell = ({
         : Promise.reject(new Error("the image is still opening.")),
     { name, size: natural ? sizeText(natural) : "" },
     setNotice,
+    route,
   );
+
+  const status = (): Notice | null => {
+    if (notice) return notice;
+    if (!doc || unreadable) return null;
+    // While Copy downloads instead, the strip says why (screens 22, 23).
+    if (copying.reason) return { text: copying.reason, error: copying.blocked };
+    return { text: statusLine(doc) };
+  };
+
+  // The tool and the selection live in the address, so a state can be copied out of it.
+  const live = ready !== null;
+  const selection = selected?.id ?? null;
+  useEffect(() => {
+    if (!live) return;
+    setQuery({ tool: tool === "select" ? null : tool, select: selection });
+  }, [live, tool, selection]);
+
+  const exportPage = () => {
+    const clipboard = route.query.get("clipboard");
+    go(
+      `#/annotate/${ready?.key}/export${clipboard ? `?clipboard=${clipboard}` : ""}`,
+    );
+  };
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -212,15 +243,11 @@ export const EditorShell = ({
           onUndo={editing.undo}
           onRedo={editing.redo}
           copy={ready ? copying : null}
-          onExport={() => go(`#/annotate/${ready?.key}/export`)}
+          onExport={exportPage}
         />
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px]">
           <CanvasStage
-            status={
-              doc && !unreadable
-                ? (notice ?? { text: statusLine(doc) })
-                : notice
-            }
+            status={status()}
             image={ready?.image ?? null}
             doc={shown}
             decoding={ready ? null : { name, natural }}

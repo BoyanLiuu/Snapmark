@@ -92,6 +92,10 @@ const fail = (reason: string): { ok: false; reason: string } => ({
   reason,
 });
 
+/** Why a file in a format Snapmark doesn't open is refused (screen 03). */
+export const refusalOf = (name: string, format: Format) =>
+  `${name} is a ${FORMAT_NAMES[format]} image. ${ACCEPTED}`;
+
 /** Whether Snapmark can open this, from its first bytes. Fast, so it runs before anything else. */
 export const checkFormat = async (
   blob: Blob,
@@ -102,8 +106,7 @@ export const checkFormat = async (
   );
   if (!format)
     return fail(`${name} isn’t an image Snapmark can read. ${ACCEPTED}`);
-  if (!OPENS.has(format))
-    return fail(`${name} is a ${FORMAT_NAMES[format]} image. ${ACCEPTED}`);
+  if (!OPENS.has(format)) return fail(refusalOf(name, format));
   return { ok: true, format };
 };
 

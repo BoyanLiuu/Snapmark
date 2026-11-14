@@ -2,7 +2,7 @@
 
 import { ExportPage } from "./export/export-page";
 import { EditorShell } from "./editor/editor-shell";
-import { NotInBrowser } from "./open/not-in-browser";
+import { NoPage, NotInBrowser } from "./open/dead-ends";
 import { OpenScreen } from "./open/open-screen";
 import { useSession } from "./use-session";
 
@@ -19,18 +19,29 @@ export const App = () => {
     home,
   } = useSession();
 
+  if (route.page === "nowhere") return <NoPage onOpen={home} />;
+  if (route.page === "missing")
+    return <NotInBrowser address={route.key} onOpen={home} />;
   // An image still being hashed has no address yet, so it shows over the open page's.
   if (!session || (route.page === "open" && session.key !== null))
     return (
-      <OpenScreen refusal={refusal} onFile={openFile} onSample={openSample} />
+      <OpenScreen
+        route={route}
+        refusal={refusal}
+        onFile={openFile}
+        onSample={openSample}
+      />
     );
   if (session.state === "finding") return null;
   if (session.state === "missing")
     return <NotInBrowser address={session.key} onOpen={home} />;
   if (route.page === "export")
-    return <ExportPage session={session} onHome={home} />;
+    return <ExportPage route={route} session={session} onHome={home} />;
+  // Keyed, so each image starts with its own tool, selection and state from the address.
   return (
     <EditorShell
+      key={session.key}
+      route={route}
       session={session}
       editing={editing}
       recovery={recovery}

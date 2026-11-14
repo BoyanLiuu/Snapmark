@@ -61,12 +61,24 @@ const Plate = ({
  * "In this browser": the images kept here, newest first (screen 01), with their loading (04),
  * empty (05) and storage-blocked (06) states. Forget asks first (07).
  */
-export const Library = ({ onChoose }: { onChoose: () => void }) => {
-  const [listing, setListing] = useState<Listing>({ state: "loading" });
+export const Library = ({
+  forced,
+  onChoose,
+}: {
+  /** A state from the address, shown instead of what storage holds. */
+  forced: "loading" | "empty" | "error" | null;
+  onChoose: () => void;
+}) => {
+  const [listing, setListing] = useState<Listing>(() => {
+    if (forced === "empty") return { state: "ready", items: [] };
+    if (forced === "error") return { state: "blocked" };
+    return { state: "loading" };
+  });
   const [forgetting, setForgetting] = useState<LibraryItem | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (forced) return;
     let live = true;
     listLibrary().then(
       (items) => live && setListing({ state: "ready", items }),
@@ -75,9 +87,11 @@ export const Library = ({ onChoose }: { onChoose: () => void }) => {
     return () => {
       live = false;
     };
-  }, [attempt]);
+  }, [attempt, forced]);
 
   const reload = () => {
+    // A forced state ends by going back to the real list.
+    if (forced) return window.location.replace("#/");
     setListing({ state: "loading" });
     setAttempt((n) => n + 1);
   };

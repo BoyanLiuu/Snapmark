@@ -49,6 +49,8 @@ export const TOOLS: Tool[] = [
   },
 ];
 
+export const TOOL_IDS = TOOLS.map((tool) => tool.id);
+
 export const KIND_ICON: Record<Annotation["kind"], LucideIcon> = {
   arrow: ArrowUpRight,
   text: Type,
