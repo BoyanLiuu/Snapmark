@@ -8,7 +8,7 @@ import { renderPng } from "@/export/render";
 import { MAX_SCALE, MIN_SCALE, type Zoom } from "@/geom/camera";
 import { drawn } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
-import { forced, go, setQuery, type Route } from "@/lib/route";
+import { go, setQuery, type Route } from "@/lib/route";
 import { createStore } from "@/lib/store";
 import { isTyping } from "@/lib/typing";
 import {
@@ -21,6 +21,7 @@ import {
 import type { LoadedImage } from "@/model/image";
 import type { Annotation, Doc, Id, Point, Size } from "@/model/types";
 import { SampleNotice } from "../open/sample-notice";
+import { useSessionActions, useSessionStore } from "../session-store";
 import { AppBar } from "./app-bar";
 import { CanvasStage, type StageActions } from "./canvas-stage";
 import { EditorBar } from "./editor-bar";
@@ -32,7 +33,6 @@ import { statusLine } from "./status";
 import { Unreadable } from "./unreadable";
 import type { StageCamera } from "./use-camera";
 import { useCopy, type Notice } from "./use-copy";
-import { TOOL_IDS, type ToolId } from "./tools";
 
 /** An open image: decoding (screen 08), or ready with its document and its history. */
 export type EditorSession =
@@ -58,15 +58,6 @@ export type EditorSession =
       /** The stored annotations couldn't be read (screen 11). */
       unreadable: boolean;
     };
-
-export interface Editing {
-  /** One change, one undo entry; a `group` merges a run of changes (a slider drag) into one. */
-  edit: (fn: (doc: Doc) => Doc, label: string, group?: string) => void;
-  seal: () => void;
-  undo: () => void;
-  redo: () => void;
-  toggleHidden: (id: Id) => void;
-}
 
 const NONE: ReadonlySet<Id> = new Set();
 
@@ -102,23 +93,15 @@ const styleOf = (a: Annotation): Style => ({
 export const EditorShell = ({
   route,
   session,
-  editing,
-  recovery,
   onHome,
 }: {
   route: Route;
   session: EditorSession;
-  editing: Editing;
-  recovery: { retry: () => void; startFresh: () => void };
   onHome: () => void;
 }) => {
-  // The address's ?tool= and ?select= on opening; M15 selects more than one.
-  const [tool, setTool] = useState<ToolId>(
-    () => forced(route, "tool", TOOL_IDS) ?? "select",
-  );
-  const [selectedId, setSelectedId] = useState<Id | null>(
-    () => route.query.get("select")?.split(",")[0] || null,
-  );
+  const tool = useSessionStore((s) => s.tool);
+  const selectedId = useSessionStore((s) => s.selectedId);
+  const actions = useSessionActions();
   const [zoom] = useState(() => zoomFrom(route));
   const [scale] = useState(() => createStore<number | null>(null));
   const stage = useRef<StageCamera>(null);
@@ -154,21 +137,21 @@ export const EditorShell = ({
   };
   const history = ready?.history;
 
-  const edit: Editing["edit"] = (fn, label, group) => {
+  const edit: typeof actions.edit = (fn, label, group) => {
     setNotice(null);
-    editing.edit(fn, label, group);
+    actions.edit(fn, label, group);
   };
 
   const draft = (kind: DrawTool, from: Point, to: Point) =>
     drawn(kind, from, to, style, "draft");
 
-  const actions: StageActions = {
-    onSelect: setSelectedId,
+  const stageActions: StageActions = {
+    onSelect: actions.select,
     onDraw: (kind, from, to) => {
       const a = drawn(kind, from, to, style, newId());
       if (a.kind === "arrow" && degenerate(a)) return;
       edit((d) => addAnnotation(d, a), "Draw");
-      setSelectedId(a.id);
+      actions.select(a.id);
     },
     onMove: (id, dx, dy) =>
       edit((d) => {
@@ -180,10 +163,10 @@ export const EditorShell = ({
     onDelete: () => {
       if (!selectedId) return;
       edit((d) => removeAnnotations(d, new Set([selectedId])), "Delete");
-      setSelectedId(null);
+      actions.select(null);
     },
     onDrawBox: () => {
-      setTool("rect");
+      actions.setTool("rect");
       setNotice({ text: "Rectangle: drag across the picture to draw a box." });
     },
   };
@@ -233,15 +216,15 @@ export const EditorShell = ({
     const key = (event: KeyboardEvent) => {
       if (isTyping(event.target) || !(event.metaKey || event.ctrlKey)) return;
       const z = event.key.toLowerCase() === "z";
-      if (z && !event.shiftKey) editing.undo();
+      if (z && !event.shiftKey) actions.undo();
       else if ((z && event.shiftKey) || event.key.toLowerCase() === "y")
-        editing.redo();
+        actions.redo();
       else return;
       event.preventDefault();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [editing]);
+  }, [actions]);
 
   return (
     <div className="flex h-dvh min-h-[560px] flex-col">
@@ -257,13 +240,13 @@ export const EditorShell = ({
           camera={ready ? camera : null}
           tool={tool}
           onToolChange={(next) => {
-            setTool(next);
+            actions.setTool(next);
             setNotice(null);
           }}
           undoLabel={history?.past.at(-1)?.label ?? null}
           redoLabel={history?.future[0]?.label ?? null}
-          onUndo={editing.undo}
-          onRedo={editing.redo}
+          onUndo={actions.undo}
+          onRedo={actions.redo}
           copy={ready ? copying : null}
           onExport={exportPage}
         />
@@ -276,7 +259,7 @@ export const EditorShell = ({
             tool={tool}
             selected={selected?.id ?? null}
             draft={draft}
-            actions={actions}
+            actions={stageActions}
             ref={stage}
             zoom={zoom}
             scale={scale}
@@ -293,7 +276,12 @@ export const EditorShell = ({
               )
             }
           >
-            {unreadable && <Unreadable {...recovery} />}
+            {unreadable && (
+              <Unreadable
+                retry={actions.retry}
+                startFresh={actions.startFresh}
+              />
+            )}
           </CanvasStage>
           <aside
             aria-label="Inspector and layers"
@@ -308,8 +296,8 @@ export const EditorShell = ({
                 }
                 style={selected ? styleOf(selected) : style}
                 onChange={restyle}
-                onCommit={editing.seal}
-                onDelete={actions.onDelete}
+                onCommit={actions.seal}
+                onDelete={stageActions.onDelete}
               />
             ) : (
               <div className="min-h-12 border-b" />
@@ -319,8 +307,8 @@ export const EditorShell = ({
               unreadable={unreadable}
               hidden={hidden}
               selected={selected?.id ?? null}
-              onSelect={setSelectedId}
-              onToggleHidden={editing.toggleHidden}
+              onSelect={actions.select}
+              onToggleHidden={actions.toggleHidden}
             />
             <p className="mt-auto px-6 py-4 text-sm text-muted-foreground">
               Drag a row, or press <Kbd>⌥ ↑</Kbd>, to change what sits on top.

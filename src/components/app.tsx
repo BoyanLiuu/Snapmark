@@ -8,16 +8,7 @@ import { useSession } from "./use-session";
 
 /** Open an image, annotate it, export it: one page, addressed by the hash. */
 export const App = () => {
-  const {
-    route,
-    session,
-    refusal,
-    editing,
-    recovery,
-    openFile,
-    openSample,
-    home,
-  } = useSession();
+  const { route, session, refusal, openFile, openSample, home } = useSession();
 
   if (route.page === "nowhere") return <NoPage onOpen={home} />;
   if (route.page === "missing")
@@ -43,8 +34,6 @@ export const App = () => {
       key={session.key}
       route={route}
       session={session}
-      editing={editing}
-      recovery={recovery}
       onHome={home}
     />
   );

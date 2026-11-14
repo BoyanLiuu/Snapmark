@@ -1,85 +1,27 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
-import { EMPTY_HISTORY, record, redo, seal, undo } from "@/history/undo";
-import { toggle } from "@/lib/set";
+import { useEffect, useRef, useState } from "react";
+import { EMPTY_HISTORY } from "@/history/undo";
 import { debounced } from "@/lib/debounce";
-import {
-  forced,
-  go,
-  imageKey,
-  parseRoute,
-  setQuery,
-  useRoute,
-} from "@/lib/route";
+import { forced, go, imageKey, parseRoute, useRoute } from "@/lib/route";
 import { createDoc } from "@/model/doc";
 import { hashBlob, shortKey } from "@/model/hash";
 import { checkFormat, decodeImage } from "@/model/image";
-import { findImage, keepImage, readDoc, saveDoc } from "@/model/persist";
+import { findImage, keepImage, saveDoc } from "@/model/persist";
 import {
   fetchSample,
   SAMPLE,
   SAMPLE_DOC,
   SAMPLE_MISSING,
 } from "@/model/sample";
-import { fromStored, toStored } from "@/model/stored";
+import { readStored, toStored } from "@/model/stored";
 import type { Doc, Size } from "@/model/types";
 import { makeThumb } from "@/render/thumb";
-import type { Editing, EditorSession } from "./editor/editor-shell";
-
-/** An address being looked up, one this browser doesn't have (screen 32), or an open image. */
-export type Session =
-  | { state: "finding"; key: string }
-  | { state: "missing"; key: string }
-  | EditorSession;
-
-type Ready = Extract<Session, { state: "ready" }>;
+import { TOOL_IDS } from "./editor/tools";
+import { setSession, useSessionStore } from "./session-store";
 
 const SAVE_DELAY = 400;
 const NONE: ReadonlySet<string> = new Set();
-
-/** The stored annotations, or `fresh` when there are none; `unreadable` when they can't be read (screen 11). */
-const storedDoc = async (hash: string, natural: Size, fresh: Doc) => {
-  try {
-    const stored = await readDoc(hash);
-    if (stored === undefined) return { doc: fresh, unreadable: false };
-    const doc = fromStored(stored, natural);
-    return { doc: doc ?? fresh, unreadable: !doc };
-  } catch {
-    return { doc: fresh, unreadable: true };
-  }
-};
-
-/** Every change goes through here with its history, so an edit and its undo entry never drift. */
-const editingFor = (
-  setSession: Dispatch<SetStateAction<Session | null>>,
-): Editing => {
-  const onReady = (step: (s: Ready) => Ready) =>
-    setSession((s) => (s?.state === "ready" ? step(s) : s));
-  const travel = (s: Ready, done: ReturnType<typeof undo>) =>
-    done ? { ...s, history: done[0], doc: done[1] } : s;
-  return {
-    edit: (fn, label, group) =>
-      onReady((s) => {
-        const doc = fn(s.doc);
-        return doc === s.doc
-          ? s
-          : { ...s, doc, history: record(s.history, s.doc, doc, label, group) };
-      }),
-    seal: () => onReady((s) => ({ ...s, history: seal(s.history) })),
-    undo: () => onReady((s) => travel(s, undo(s.history, s.doc))),
-    redo: () => onReady((s) => travel(s, redo(s.history, s.doc))),
-    toggleHidden: (id) =>
-      onReady((s) => ({ ...s, hidden: toggle(s.hidden, id) })),
-  };
-};
 
 /**
  * The open image and its address. A chosen file is checked on the open screen, so one Snapmark
@@ -89,7 +31,7 @@ const editingFor = (
  */
 export const useSession = () => {
   const route = useRoute();
-  const [session, setSession] = useState<Session | null>(null);
+  const session = useSessionStore((s) => s.session);
   const [refusal, setRefusal] = useState<string | null>(null);
   // Each open takes a ticket; work for an older one, or for a closed image, is dropped.
   const ticket = useRef(0);
@@ -131,7 +73,7 @@ export const useSession = () => {
     }
     const { image } = opened;
     const fresh = sample ? SAMPLE_DOC : createDoc(image.natural);
-    const stored = await storedDoc(hash, image.natural, fresh);
+    const stored = await readStored(hash, image.natural, fresh);
     if (!live()) {
       image.bitmap.close();
       return;
@@ -166,6 +108,7 @@ export const useSession = () => {
   const opening = (name: string, natural: Size | null, sample: boolean) => {
     flush();
     setRefusal(null);
+    useSessionStore.setState({ tool: "select", selectedId: null });
     setSession({ state: "decoding", key: null, name, natural, sample });
     return ++ticket.current;
   };
@@ -203,12 +146,15 @@ export const useSession = () => {
       return;
     }
     const { name, natural, sample } = image;
+    // The address's ?tool= and ?select=; M15 selects more than one.
+    const route = parseRoute(window.location.hash);
+    useSessionStore.setState({
+      tool: forced(route, "tool", TOOL_IDS) ?? "select",
+      selectedId: route.query.get("select")?.split(",")[0] || null,
+    });
     setSession({ state: "decoding", key, name, natural, sample });
     // ?state=loading holds the image at screen 08; ?state=error shows screen 11.
-    const state = forced(parseRoute(window.location.hash), "state", [
-      "loading",
-      "error",
-    ]);
+    const state = forced(route, "state", ["loading", "error"]);
     if (state === "loading") return;
     load(mine, image.blob, name, sample, {
       hash: image.hash,
@@ -232,24 +178,6 @@ export const useSession = () => {
     go("#/");
   };
 
-  const recovery = {
-    retry: async () => {
-      if (session?.state !== "ready") return;
-      setQuery({ state: null });
-      const { hash, image, doc } = session;
-      const read = await storedDoc(hash, image.natural, doc);
-      setSession((s) =>
-        s?.state === "ready" && s.hash === hash ? { ...s, ...read } : s,
-      );
-    },
-    startFresh: () => {
-      setQuery({ state: null });
-      setSession((s) =>
-        s?.state === "ready" ? { ...s, unreadable: false } : s,
-      );
-    },
-  };
-
   // The address changed: back, forward, a link or a reload.
   const routeKey = imageKey(route);
   useEffect(() => {
@@ -268,14 +196,10 @@ export const useSession = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc]);
 
-  const editing = useMemo(() => editingFor(setSession), []);
-
   return {
     route,
     session,
     refusal,
-    editing,
-    recovery,
     openFile,
     openSample,
     home,

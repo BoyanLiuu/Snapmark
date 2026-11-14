@@ -14,7 +14,8 @@ See [MILESTONES.md](MILESTONES.md).
 ## Stack
 
 Next.js 16 (App Router, client-only), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Lucide icons,
-Canvas 2D by hand. Vitest for units, Playwright for the browser checks.
+Canvas 2D by hand. Zustand holds the open image and the editor's state, Zod checks data from outside
+the app, `idb` keeps the library in IndexedDB. Vitest for units, Playwright for the browser checks.
 
 **Fonts.** Switzer's licence allows self-hosting but not committing the files, so
 `scripts/fetch-fonts.mjs` downloads them from Fontshare into `src/assets/fonts/switzer/`
@@ -43,6 +44,7 @@ src/
   app/                  Next.js: layout, page, globals.css (the design file's tokens)
   components/ui/        shadcn primitives
   components/app.tsx    the open page, the editor or the export page, by address (use-session.ts)
+  components/session-store.ts  the open image, its history, the tool and selection (Zustand)
   components/open/      the open screen: pick, drop, paste, the hero lenses, the library (screen 32 too)
   components/export/    the export page
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
@@ -52,6 +54,7 @@ src/
   model/image.ts        format from bytes, decode upright
   model/sample.ts       the sample photo (public/samples/) and its annotations
   model/persist.ts      IndexedDB: images and documents by the hash of the bytes (hash.ts, stored.ts)
+  model/schema.ts       Zod schemas for annotations from outside the app, checked against their types
   export/               render.ts (the PNG at natural size), clipboard.ts (Copy, or Download)
   geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts, hit.ts,
                         resize.ts, handles.ts

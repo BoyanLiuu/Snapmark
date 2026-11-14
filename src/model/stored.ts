@@ -3,19 +3,23 @@
  * annotations in paint order, filed under the hash of the image's bytes.
  */
 
-import { KIND_LABEL } from "./describe";
+import { z } from "zod";
 import { annotations, createDoc } from "./doc";
-import type { Annotation, Doc, Size } from "./types";
+import { readDoc } from "./persist";
+import { annotationSchema } from "./schema";
+import type { Doc, Size } from "./types";
 
 const SCHEMA_VERSION = 1;
 
-export interface StoredDoc {
-  hash: string;
-  schemaVersion: number;
-  annotations: Annotation[];
-  openedAt: number;
-  editedAt: number | null;
-}
+const storedSchema = z.object({
+  hash: z.string(),
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  annotations: z.array(annotationSchema),
+  openedAt: z.number(),
+  editedAt: z.number().nullable(),
+});
+
+export type StoredDoc = z.infer<typeof storedSchema>;
 
 export const toStored = (hash: string, doc: Doc): StoredDoc => ({
   hash,
@@ -25,28 +29,25 @@ export const toStored = (hash: string, doc: Doc): StoredDoc => ({
   editedAt: doc.editedAt?.getTime() ?? null,
 });
 
-const isObject = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null;
-
-const readable = (a: unknown): a is Annotation =>
-  isObject(a) &&
-  typeof a.id === "string" &&
-  typeof a.kind === "string" &&
-  Object.hasOwn(KIND_LABEL, a.kind);
-
 /** The document back, or null when the record isn't one this version can read. */
 export const fromStored = (record: unknown, natural: Size): Doc | null => {
-  if (
-    !isObject(record) ||
-    record.schemaVersion !== SCHEMA_VERSION ||
-    typeof record.openedAt !== "number" ||
-    !Array.isArray(record.annotations) ||
-    !record.annotations.every(readable)
-  )
-    return null;
-  return createDoc(natural, record.annotations, {
-    openedAt: new Date(record.openedAt),
-    editedAt:
-      typeof record.editedAt === "number" ? new Date(record.editedAt) : null,
+  const parsed = storedSchema.safeParse(record);
+  if (!parsed.success) return null;
+  const { openedAt, editedAt } = parsed.data;
+  return createDoc(natural, parsed.data.annotations, {
+    openedAt: new Date(openedAt),
+    editedAt: editedAt === null ? null : new Date(editedAt),
   });
+};
+
+/** The stored annotations, or `fresh` when there are none; `unreadable` when they can't be read (screen 11). */
+export const readStored = async (hash: string, natural: Size, fresh: Doc) => {
+  try {
+    const stored = await readDoc(hash);
+    if (stored === undefined) return { doc: fresh, unreadable: false };
+    const doc = fromStored(stored, natural);
+    return { doc: doc ?? fresh, unreadable: !doc };
+  } catch {
+    return { doc: fresh, unreadable: true };
+  }
 };
