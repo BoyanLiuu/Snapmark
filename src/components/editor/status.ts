@@ -1,3 +1,4 @@
+import { annotationCount } from "@/model/describe";
 import type { Doc } from "@/model/types";
 
 // Spelled out, not Intl: en-GB writes "Sept" in newer ICU versions, and browsers differ.
@@ -26,5 +27,5 @@ export const statusLine = (doc: Doc) => {
   const n = doc.order.length;
   if (n === 0 || !doc.editedAt)
     return `Nothing drawn yet. Opened ${formatWhen(doc.openedAt)}.`;
-  return `${n} annotation${n === 1 ? "" : "s"}, last edited ${formatWhen(doc.editedAt)}.`;
+  return `${annotationCount(n)}, last edited ${formatWhen(doc.editedAt)}.`;
 };

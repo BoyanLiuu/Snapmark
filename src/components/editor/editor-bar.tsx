@@ -1,11 +1,17 @@
 "use client";
 
+import { nbsp } from "@/lib/text";
 import { Minus, Plus, Redo2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TOOLS, type ToolId } from "./tools";
+import type { Copying } from "./use-copy";
 
-const nbsp = (s: string) => s.replaceAll(" ", "\u00a0");
+const copyLabel = (copy: Copying | null) => {
+  if (copy?.downloads) return "Download PNG";
+  if (copy?.copied) return "Copied";
+  return "Copy";
+};
 
 export interface EditorBarProps {
   fileName: string;
@@ -20,6 +26,9 @@ export interface EditorBarProps {
   redoLabel: string | null;
   onUndo: () => void;
   onRedo: () => void;
+  /** Null until the image is ready. */
+  copy: Copying | null;
+  onExport: () => void;
 }
 
 /**
@@ -36,6 +45,8 @@ export const EditorBar = ({
   redoLabel,
   onUndo,
   onRedo,
+  copy,
+  onExport,
 }: EditorBarProps) => {
   const size = natural ? `${natural.w} × ${natural.h}` : "";
   return (
@@ -156,15 +167,22 @@ export const EditorBar = ({
       </div>
 
       <div className="flex gap-2">
-        <Button variant="outline" size="control" title="Export arrives in M8">
+        <Button
+          variant="outline"
+          size="control"
+          disabled={!copy}
+          onClick={onExport}
+        >
           Export
         </Button>
         <Button
           size="control"
           className="min-w-[8.5rem]"
-          title="Copy the PNG (⌘C) · arrives in M8"
+          disabled={!copy}
+          title={copy?.reason ?? "Copy the PNG at the image’s own size"}
+          onClick={copy?.copy}
         >
-          Copy
+          {copyLabel(copy)}
         </Button>
       </div>
     </div>

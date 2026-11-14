@@ -28,14 +28,20 @@ export const SAMPLE = {
   },
 } as const;
 
-export const loadSample = async (): Promise<OpenResult> => {
+/** The sample's bytes, from this app; null when they don't arrive. */
+export const fetchSample = async () => {
   const response = await fetch(SAMPLE.url).catch(() => null);
-  if (!response?.ok)
-    return {
-      ok: false,
-      reason: "The sample didn’t load. Reload the page and try again.",
-    };
-  return decodeImage(await response.blob(), SAMPLE.name);
+  return response?.ok ? response.blob() : null;
+};
+
+export const SAMPLE_MISSING =
+  "The sample didn’t load. Reload the page and try again.";
+
+export const loadSample = async (): Promise<OpenResult> => {
+  const blob = await fetchSample();
+  return blob
+    ? decodeImage(blob, SAMPLE.name)
+    : { ok: false, reason: SAMPLE_MISSING };
 };
 
 /** Defaults for this image's width: width ÷ 400 for strokes (ARCHITECTURE.md §3). */

@@ -232,13 +232,13 @@ The order is layout first, then coordinates, then behaviour: the shell (M1) draw
 
 **Build.**
 
-- [ ] `export/render.ts`: `OffscreenCanvas(naturalWidth, naturalHeight)`, identity transform, `await document.fonts.ready`, then the same `drawScene` with `minVisualStroke: 0`.
-- [ ] `export/encode.ts`: `convertToBlob` — never `toDataURL`.
-- [ ] `export/clipboard.ts`: `ClipboardItem` given the blob **promise**, called synchronously from the click. Never `await` the blob first.
-- [ ] The export page (screen `25`): live preview with its own scale readout, `Output px` / `Pixels MP` / `Budget MP`, `Copy PNG` primary and `Download PNG` secondary.
-- [ ] Caption the preview _"Drawn from the document at the image's own size, never from the screen."_
-- [ ] On insecure context or missing API, `Copy` is replaced by `Download` with the reason (screens `22`, `23`). It never silently no-ops.
-- [ ] A copy-succeeded confirmation (screen `21`).
+- [x] `export/render.ts`: `OffscreenCanvas(naturalWidth, naturalHeight)`, identity transform, `await document.fonts.ready`, then the same `drawScene` with `minVisualStroke: 0`.
+- [x] `export/encode.ts`: `convertToBlob` — never `toDataURL`. (In `export/render.ts` for now: one call.)
+- [x] `export/clipboard.ts`: `ClipboardItem` given the blob **promise**, called synchronously from the click. Never `await` the blob first.
+- [x] The export page (screen `25`): live preview with its own scale readout, `Output px` / `Pixels MP` / `Budget MP`, `Copy PNG` primary and `Download PNG` secondary.
+- [x] Caption the preview _"Drawn from the document at the image's own size, never from the screen."_
+- [x] On insecure context or missing API, `Copy` is replaced by `Download` with the reason (screens `22`, `23`). It never silently no-ops.
+- [x] A copy-succeeded confirmation (screen `21`).
 
 **Check — the MVP acceptance test.** Load a 3840×2407 screenshot; it fits at ~24%. Draw a rectangle tightly around a known UI element. Export, open the PNG in Preview at 100%, and read the rectangle's top-left with the cursor readout — **within 1 px** of where it sits in the editor. Confirm the file is **3840×2407 and not 7680×4814** on a Retina laptop. Click `Copy`, paste into Slack, and the image arrives with the rectangle on it. Then load the page over plain `http` and confirm `Copy` has become `Download` with an explanation. In Safari specifically, confirm `Copy` works — if it fails, you awaited the blob.
 
@@ -258,15 +258,15 @@ The order is layout first, then coordinates, then behaviour: the shell (M1) draw
 
 **Build.**
 
-- [ ] `model/persist.ts`: IndexedDB via `idb` 8, storing the image `Blob` and the doc keyed by **SHA-256 of the source bytes** (`crypto.subtle.digest`).
-- [ ] The "In this browser" page listing stored images with thumbnails.
-- [ ] Loading state as skeletons, never a spinner (screen `04`).
-- [ ] Empty state with the explanation that opening the same file brings its annotations back, and one primary action (screen `05`).
-- [ ] Storage-blocked state for private mode / denied quota, with the picture-still-works reassurance (screen `06`).
-- [ ] "Forget an image" behind a confirm (screen `07`).
-- [ ] An unknown hash resolves to a stated dead end, not a crash (screen `32`).
-- [ ] Annotations-unreadable: dim the image, offer **Try again** and **Start without them**, and show the inline error in the Layers rail — the picture is fine and must stay usable (screen `11`).
-- [ ] Debounced write, 400 ms.
+- [x] `model/persist.ts`: IndexedDB via `idb` 8, storing the image `Blob` and the doc keyed by **SHA-256 of the source bytes** (`crypto.subtle.digest`).
+- [x] The "In this browser" page listing stored images with thumbnails.
+- [x] Loading state as skeletons, never a spinner (screen `04`).
+- [x] Empty state with the explanation that opening the same file brings its annotations back, and one primary action (screen `05`).
+- [x] Storage-blocked state for private mode / denied quota, with the picture-still-works reassurance (screen `06`).
+- [x] "Forget an image" behind a confirm (screen `07`).
+- [x] An unknown hash resolves to a stated dead end, not a crash (screen `32`).
+- [x] Annotations-unreadable: dim the image, offer **Try again** and **Start without them**, and show the inline error in the Layers rail — the picture is fine and must stay usable (screen `11`).
+- [x] Debounced write, 400 ms.
 
 **Check.** Open a file, draw nothing, reload — the image is in the library. Open the _same_ file from a different folder path and confirm it resolves to the same record, proving the key is the bytes and not the name. Open the app in a private window with storage blocked and confirm screen `06` instead of a white page. Navigate to `#/annotate/000000000000` and confirm screen `32`. Force a storage read failure and confirm screen `11`: the image still renders, Layers shows the inline error, and **Start without them** leaves you in a working editor.
 
@@ -567,3 +567,6 @@ Still unbuilt but deliberately parked, in rough value order: auto-incrementing n
 | 2026-11-13 | M6        | **Resize is computed from the box the drag started with**: the opposite corner or edge is the anchor and the grabbed one follows the pointer, so passing the anchor flips the box and the held handle becomes its mirror (for the cursor) without the incremental bookkeeping §7 warns about. Shift keeps the aspect on corners, the larger change winning; edges ignore it. Handles appear on boxes (rectangle, highlight, pixelate); arrows get end handles in M7 and text a width in M13. The overlay draws handles from the same `handlePoint` the hit test uses, 8 screen px at any zoom.                                                                                                                                                                                                                                                                                                    |
 | 2026-11-13 | M7        | **Undo by operation.** Every edit goes through one place (`components/app.tsx`) as a function of the current document with a label; it records only the annotations that changed, before and after, and the paint order if it moved (`history/undo.ts`). A gesture is one edit because the document only changes on pointer-up; a slider drag is many edits in one group (`stroke:<id>`), merged into one entry until the slider is let go; each colour pick is its own entry. ⌘Z and ⇧⌘Z (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y elsewhere) step it, ignored while typing; the buttons say what they would undo. Entries keep whole annotations rather than property diffs: none of the six kinds is more than a few numbers and a string.                                                                                                                                                                 |
 | 2026-11-13 | M7        | Arrows have a handle at each end and no outline (the line is its own), and the size tag reads their length; the inspector shows From, To and Length as screen `20` does. An arrow shorter than two strokes is discarded on release. The head is `min(max(28% of the length, 4 strokes), 10 strokes, half the length)`, so a short thick arrow is half head, never 90%. Handles moved to `geom/handles.ts`, one list per kind that the overlay draws and the hit test reads. The M5 move check had started its drag on the box's corner, a resize handle since M6; it now drags the frame and checks the width is unchanged.                                                                                                                                                                                                                                                                       |
+| 2026-11-14 | M8, M9    | **Three routes arrive now, not in M10**: `#/`, `#/annotate/:key` and `#/annotate/:key/export`, because the export page (`25`), a reload and screen `32` all need an address. The key is the first 12 hex digits of the SHA-256, as the design file writes it; the store is keyed by the whole hash and finds an address by a key range on its prefix. M10 keeps the state parameters, the 404 (`33`) and writing state back to the address.                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-11-14 | M8        | Render and encode are one function (`export/render.ts`, `renderPng`), since encoding is one `convertToBlob` call; `encode.ts` arrives with JPEG in M16. The export page's preview is the PNG itself in an `<img>`, so its scale readout is the file's. Copy and the export draw what the canvas shows: hidden layers stay out, and `hidden` moved from the editor into the session so the export page sees it too. JPEG, JSON and the 64 MP downscale are M16; their options show, disabled. A blocked write (`NotAllowedError`) turns Copy into **Download PNG** for the rest of the visit with the reason in red (`23`); an insecure page or no `ClipboardItem` does so from the start, the reason on the button and in the status line (`22`).                                                                                                                                                 |
+| 2026-11-14 | M9        | The library is the open page's lower half, "In this browser", as screen `01` lays it out, not a page of its own. An image is written once, with a 256 px WebP thumbnail; its document is saved 400 ms after the last change and flushed when the image closes. **Blocked storage is not an unreadable document**: in a private window images open as usual and simply aren't kept (`06` explains it in the list); screen `11` is only for a stored record that can't be read (another schema version, a kind this version doesn't know, or a read that fails). The sample is kept like any image, so changes to it survive too.                                                                                                                                                                                                                                                                   |

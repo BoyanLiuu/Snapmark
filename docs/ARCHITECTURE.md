@@ -474,6 +474,7 @@ src/
     doc.ts            # Map<Id,Annotation> + order[]; the only place annotations are mutated
     bbox.ts           # per-kind bbox INCLUDING stroke, arrowhead spread, wrapped text, plate
     persist.ts        # IndexedDB; image blob + doc keyed by SHA-256 of the source bytes
+    stored.ts         # the doc as stored, and refused if this version can't read it
   geom/
     matrix.ts         # DOMMatrix build/invert, toImage/toScreen. BUILD AND TEST THIS FIRST
     camera.ts         # fit(), zoomAt() cursor-anchored, pan, clamp, 1:1
@@ -487,8 +488,8 @@ src/
     view.ts           # two canvases, DPR sizing, the ONLY call to ctx.setTransform
     overlay.ts        # selection, 8 handles, marquee, draft, out-of-bounds gutter
   export/
-    render.ts         # OffscreenCanvas at natural size, identity transform, fonts.ready
-    encode.ts         # convertToBlob, PNG vs JPEG, 64 MP budget + downscale notice
+    render.ts         # OffscreenCanvas at natural size, identity transform, fonts.ready, convertToBlob
+    encode.ts         # PNG vs JPEG, 64 MP budget + downscale notice (M16)
     clipboard.ts      # ClipboardItem given a blob PROMISE (Safari activation)
     limits.ts         # per-engine canvas caps + the 1px allocation probe
   interact/

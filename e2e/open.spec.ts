@@ -59,7 +59,7 @@ test("a HEIC file is refused by name, and the page stays put", async ({
     "photo.heic is a HEIC image. Snapmark opens PNG, JPEG and WebP: save it as one of those and try again.",
   );
   await expect(
-    page.getByRole("button", { name: "Choose an image" }),
+    page.getByRole("button", { name: "Choose an image" }).first(),
   ).toBeFocused();
   await expect(
     page.getByRole("heading", { level: 1, name: /Annotate to the pixel/ }),

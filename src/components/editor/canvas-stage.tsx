@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { Button } from "@/components/ui/button";
 import { fit } from "@/geom/camera";
@@ -25,6 +26,7 @@ import {
   type ToolId,
 } from "@/interact/machine";
 import { createStore, type Store } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import { isTyping } from "@/lib/typing";
 import { useRefValue } from "@/lib/use-ref-value";
 import { outline } from "@/model/bbox";
@@ -36,6 +38,7 @@ import { drawOverlay, drawSelection } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
 import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
+import type { Notice } from "./use-copy";
 
 const POINTER_OFF = "Pointer off";
 
@@ -126,8 +129,9 @@ export const CanvasStage = ({
   draft,
   actions,
   onZoomChange,
+  children,
 }: {
-  status: string;
+  status: Notice | null;
   /** Null, with `doc`, until the image has decoded. */
   image: Pick<LoadedImage, "bitmap" | "natural"> | null;
   doc: Doc | null;
@@ -137,6 +141,8 @@ export const CanvasStage = ({
   draft: (tool: DrawTool, from: Point, to: Point) => Annotation;
   actions: StageActions;
   onZoomChange?: (scale: number) => void;
+  /** Covers the stage, and takes the pointer from it (screen 11). */
+  children?: ReactNode;
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const baseRef = useRef<HTMLCanvasElement>(null);
@@ -392,9 +398,10 @@ export const CanvasStage = ({
           onPointerLeave={leave}
         />
         {decoding && <DecodingPlate {...decoding} />}
-        {image && doc && doc.order.length === 0 && (
+        {image && doc && doc.order.length === 0 && !children && (
           <EmptyPlate onDrawBox={actions.onDrawBox} />
         )}
+        {children}
       </div>
 
       <div
@@ -402,8 +409,14 @@ export const CanvasStage = ({
         className="relative flex min-h-[41px] items-center gap-6 overflow-hidden border-t bg-background px-4 py-1 text-sm"
       >
         <CursorReadout store={cursor} />
-        <p role="status" className="min-w-0 truncate text-ink-2">
-          {status}
+        <p
+          role="status"
+          className={cn(
+            "min-w-0 truncate text-ink-2",
+            status?.error && "text-destructive",
+          )}
+        >
+          {status?.text}
         </p>
         {debug && <RenderReadout stats={stats} />}
       </div>

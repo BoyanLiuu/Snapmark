@@ -5,7 +5,7 @@ export const SampleNotice = () => (
   <div className="flex shrink-0 flex-wrap gap-x-6 gap-y-1 border-t bg-card px-4 py-2 text-sm text-muted-foreground">
     <p>
       This is the sample, with the design file’s sample layers. The rectangle
-      draws; the other tools follow.
+      and the arrow draw; the other tools follow.
     </p>
     <SampleCredit />
   </div>

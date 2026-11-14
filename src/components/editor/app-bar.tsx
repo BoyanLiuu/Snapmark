@@ -3,7 +3,7 @@ import { Mark } from "./tools";
 
 /**
  * The bar over every screen: wordmark and Shortcuts, plus the Images nav once an image is open.
- * The wordmark and Images both lead back to opening an image until the library arrives in M9.
+ * Both lead to the open page, where the images kept in this browser are listed.
  */
 export const AppBar = ({
   variant,

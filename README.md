@@ -6,9 +6,9 @@ at the image's own size. Nothing leaves the browser.
 The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
 Hallmark design file that is not in this repo yet.
 
-**Status:** M0–M7 of M0–M19 done: open an image, draw boxes and arrows on it, select, move,
-resize, restyle and delete them, and undo each step, all in image px through a tested coordinate
-chain. Export and Copy are next.
+**Status:** M0–M9 of M0–M19 done: the MVP and the library. Open an image, draw boxes and
+arrows, undo, then Copy or export a PNG at the image's own size; images and their annotations stay
+in this browser, filed under the SHA-256 of their bytes. Routes for every screen are next.
 See [MILESTONES.md](MILESTONES.md).
 
 ## Stack
@@ -42,15 +42,17 @@ src/components/ui` to turn their `function` declarations into arrow functions.
 src/
   app/                  Next.js: layout, page, globals.css (the design file's tokens)
   components/ui/        shadcn primitives
-  components/app.tsx    open an image, then annotate it
-  components/open/      the open screen: pick, drop, paste, and the hero lenses
+  components/app.tsx    the open page, the editor or the export page, by address (use-session.ts)
+  components/open/      the open screen: pick, drop, paste, the hero lenses, the library (screen 32 too)
+  components/export/    the export page
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
-                        (sample.ts holds the design file's sample layers until M15)
   model/types.ts        ALL geometry is image space: the annotation types
   model/doc.ts          the document: annotations by id, in paint order
   model/palette.ts      the six colours
   model/image.ts        format from bytes, decode upright
   model/sample.ts       the sample photo (public/samples/) and its annotations
+  model/persist.ts      IndexedDB: images and documents by the hash of the bytes (hash.ts, stored.ts)
+  export/               render.ts (the PNG at natural size), clipboard.ts (Copy, or Download)
   geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts, hit.ts,
                         resize.ts, handles.ts
   interact/             machine.ts (press, move, release, preview), draft.ts (what a drag draws)

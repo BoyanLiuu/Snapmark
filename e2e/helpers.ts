@@ -1,16 +1,24 @@
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
+import { LANDMARKS } from "./chart";
+
+const CHART = readFileSync(
+  join(import.meta.dirname, "files", "test-chart.png"),
+);
 
 /** From the open screen into the editor, on the test chart, chosen like any file. */
-export const openChart = async (page: Page) => {
+export const openChart = async (page: Page, name = "test-chart.png") => {
   await page.goto("/");
   await page
     .locator('input[type="file"]')
-    .setInputFiles(join(import.meta.dirname, "files", "test-chart.png"));
-  await expect(
-    page.getByRole("heading", { level: 1, name: "test-chart.png" }),
-  ).toBeVisible();
+    .setInputFiles({ name, mimeType: "image/png", buffer: CHART });
+  await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 };
+
+/** The layer list's count. */
+export const count = (page: Page) =>
+  page.getByRole("complementary").getByText(/^\d+ annotations?$/);
 
 /** Where the base canvas painted a colour: the centre of its pixels, in device px. */
 export const findPainted = (
@@ -45,3 +53,39 @@ export const findPainted = (
     },
     [colour, tolerance] as const,
   );
+
+/** Where a landmark is on the page, in CSS px. */
+export const onPage = async (
+  page: Page,
+  landmark: (typeof LANDMARKS)[number],
+) => {
+  await expect.poll(() => findPainted(page, landmark.colour)).not.toBeNull();
+  const painted = (await findPainted(page, landmark.colour))!;
+  const dpr = await page.evaluate(() => window.devicePixelRatio);
+  const box = (await page
+    .locator('canvas[data-layer="overlay"]')
+    .boundingBox())!;
+  return { x: box.x + painted.x / dpr, y: box.y + painted.y / dpr };
+};
+
+export const drag = async (
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) => {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 8 });
+  await page.mouse.up();
+};
+
+/** A rectangle from landmark A to landmark B. */
+export const drawBox = async (page: Page) => {
+  const [A, B] = LANDMARKS;
+  await page.getByRole("radio", { name: "Rectangle" }).click();
+  await drag(page, await onPage(page, A), await onPage(page, B));
+};
+
+/** A box's X, Y, W or H in the inspector. */
+export const fact = async (page: Page, name: string) =>
+  Number(await page.getByTestId(`fact-${name}`).textContent());

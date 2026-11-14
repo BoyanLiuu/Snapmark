@@ -1,7 +1,6 @@
-import type { Page } from "@playwright/test";
 import { LANDMARKS } from "./chart";
 import { expect, test } from "./fixtures";
-import { findPainted, openChart } from "./helpers";
+import { count, drag, fact, onPage, openChart } from "./helpers";
 
 /**
  * M5–M7: draw a box or an arrow, select, move, resize and delete it, and undo each step.
@@ -11,39 +10,11 @@ import { findPainted, openChart } from "./helpers";
 
 const [A, B] = LANDMARKS;
 
-/** Where a landmark is on the page, in CSS px. */
-const onPage = async (page: Page, landmark: (typeof LANDMARKS)[number]) => {
-  await expect.poll(() => findPainted(page, landmark.colour)).not.toBeNull();
-  const painted = (await findPainted(page, landmark.colour))!;
-  const dpr = await page.evaluate(() => window.devicePixelRatio);
-  const box = (await page
-    .locator('canvas[data-layer="overlay"]')
-    .boundingBox())!;
-  return { x: box.x + painted.x / dpr, y: box.y + painted.y / dpr };
-};
-
-const drag = async (
-  page: Page,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-) => {
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  await page.mouse.move(to.x, to.y, { steps: 8 });
-  await page.mouse.up();
-};
-
 /** A point on the bottom of the box from A to B, a quarter of the way along: frame, not handle. */
 const onFrame = (a: { x: number }, b: { x: number; y: number }) => ({
   x: b.x + (a.x - b.x) / 4,
   y: b.y,
 });
-
-const field = async (page: Page, name: "x" | "y" | "w" | "h") =>
-  Number(await page.getByTestId(`fact-${name}`).textContent());
-
-const count = (page: Page) =>
-  page.getByRole("complementary").getByText(/^\d+ annotations?$/);
 
 test.beforeEach(async ({ page }) => {
   await openChart(page);
@@ -60,7 +31,7 @@ test("a box dragged from landmark A to B is recorded in image px, and selected",
   // One screen px is about 5 image px at this fit, and each landmark is found to within one.
   const near = async (name: "x" | "y" | "w" | "h", value: number) =>
     expect(
-      Math.abs((await field(page, name)) - value),
+      Math.abs((await fact(page, name)) - value),
       name,
     ).toBeLessThanOrEqual(8);
   await near("x", B.x);
@@ -91,20 +62,18 @@ test("a box moves by dragging its frame, the document changing only on release, 
   const b = await onPage(page, B);
   await drag(page, a, b);
   await page.getByRole("radio", { name: "Select" }).click();
-  const x = await field(page, "x");
-  const w = await field(page, "w");
+  const x = await fact(page, "x");
+  const w = await fact(page, "w");
   const scale = (a.x - b.x) / (A.x - B.x);
 
   const from = onFrame(a, b);
   await page.mouse.move(from.x, from.y);
   await page.mouse.down();
   await page.mouse.move(from.x + 100, from.y, { steps: 8 });
-  expect(await field(page, "x"), "untouched mid-drag").toBe(x);
+  expect(await fact(page, "x"), "untouched mid-drag").toBe(x);
   await page.mouse.up();
-  await expect
-    .poll(() => field(page, "x"))
-    .toBeGreaterThan(x + 100 / scale - 8);
-  expect(await field(page, "w"), "moved, not resized").toBe(w);
+  await expect.poll(() => fact(page, "x")).toBeGreaterThan(x + 100 / scale - 8);
+  expect(await fact(page, "w"), "moved, not resized").toBe(w);
 
   await page.keyboard.press("Delete");
   await expect(count(page)).toHaveText("0 annotations");
@@ -121,7 +90,7 @@ test("dragging a corner past the opposite one flips the box, in image px", async
   await drag(page, { x: b.x, y: a.y }, { x: a.x + 100, y: b.y + 60 });
   const near = async (name: "x" | "y" | "w" | "h", value: number) =>
     expect(
-      Math.abs((await field(page, name)) - value),
+      Math.abs((await fact(page, name)) - value),
       name,
     ).toBeLessThanOrEqual(8);
   await near("x", A.x);
@@ -162,10 +131,10 @@ test("undo and redo step by operation: a drag is one entry, a slider drag is one
   const b = await onPage(page, B);
   await drag(page, a, b);
   await page.getByRole("radio", { name: "Select" }).click();
-  const x = await field(page, "x");
+  const x = await fact(page, "x");
   const from = onFrame(a, b);
   await drag(page, from, { x: from.x + 100, y: from.y });
-  await expect.poll(() => field(page, "x")).toBeGreaterThan(x);
+  await expect.poll(() => fact(page, "x")).toBeGreaterThan(x);
 
   const stroke = page.getByRole("slider", { name: "Stroke" });
   const before = await stroke.getAttribute("aria-valuenow");
@@ -180,7 +149,7 @@ test("undo and redo step by operation: a drag is one entry, a slider drag is one
   await page.keyboard.press("ControlOrMeta+z");
   await expect(stroke).toHaveAttribute("aria-valuenow", before!);
   await page.keyboard.press("ControlOrMeta+z");
-  await expect.poll(() => field(page, "x")).toBe(x);
+  await expect.poll(() => fact(page, "x")).toBe(x);
   await page.keyboard.press("ControlOrMeta+z");
   await expect(count(page)).toHaveText("0 annotations");
   await expect(undoButton).toBeDisabled();
@@ -188,5 +157,5 @@ test("undo and redo step by operation: a drag is one entry, a slider drag is one
   await page.keyboard.press("ControlOrMeta+Shift+z");
   await page.keyboard.press("ControlOrMeta+Shift+z");
   await expect(count(page)).toHaveText("1 annotation");
-  await expect.poll(() => field(page, "x")).toBeGreaterThan(x);
+  await expect.poll(() => fact(page, "x")).toBeGreaterThan(x);
 });

@@ -1,11 +1,13 @@
 "use client";
 
+import { sizeText } from "@/lib/text";
 import { useEffect, useMemo, useState } from "react";
 import { degenerate } from "@/geom/arrow";
 import type { History } from "@/history/undo";
+import { renderPng } from "@/export/render";
 import { drawn } from "@/interact/draft";
 import type { DrawTool } from "@/interact/machine";
-import { toggle } from "@/lib/set";
+import { go } from "@/lib/route";
 import { isTyping } from "@/lib/typing";
 import {
   addAnnotation,
@@ -25,23 +27,33 @@ import { Kbd } from "./kbd";
 import { LayerList } from "./layer-list";
 import { layerRows } from "./layers";
 import { statusLine } from "./status";
+import { Unreadable } from "./unreadable";
+import { useCopy, type Notice } from "./use-copy";
 import type { ToolId } from "./tools";
 
 /** An open image: decoding (screen 08), or ready with its document and its history. */
-export type Session =
+export type EditorSession =
   | {
       state: "decoding";
+      /** Null until the bytes are hashed. */
+      key: string | null;
       name: string;
-      /** Known before decoding only for the sample. */
+      /** Known before decoding for the sample and for an image kept in this browser. */
       natural: Size | null;
       sample: boolean;
     }
   | {
       state: "ready";
+      key: string;
+      hash: string;
       image: LoadedImage;
       doc: Doc;
       history: History;
+      /** Hidden from the canvas and the export, not from the document. */
+      hidden: ReadonlySet<Id>;
       sample: boolean;
+      /** The stored annotations couldn't be read (screen 11). */
+      unreadable: boolean;
     };
 
 export interface Editing {
@@ -50,9 +62,16 @@ export interface Editing {
   seal: () => void;
   undo: () => void;
   redo: () => void;
+  toggleHidden: (id: Id) => void;
 }
 
 const NONE: ReadonlySet<Id> = new Set();
+
+/** The image's name and natural size, known or not yet, whatever the state. */
+export const imageOf = (session: EditorSession) =>
+  session.state === "ready"
+    ? { name: session.image.name, natural: session.image.natural }
+    : { name: session.name, natural: session.natural };
 
 const newId = () => crypto.randomUUID().replaceAll("-", "").slice(0, 8);
 
@@ -69,17 +88,18 @@ const styleOf = (a: Annotation): Style => ({
 export const EditorShell = ({
   session,
   editing,
-  onClose,
+  recovery,
+  onHome,
 }: {
-  session: Session;
+  session: EditorSession;
   editing: Editing;
-  onClose: () => void;
+  recovery: { retry: () => void; startFresh: () => void };
+  onHome: () => void;
 }) => {
   const [tool, setTool] = useState<ToolId>("select");
   const [zoom, setZoom] = useState<number | null>(null);
-  const [hidden, setHidden] = useState<ReadonlySet<Id>>(NONE);
   const [selectedId, setSelectedId] = useState<Id | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
   // The stroke follows the image's width until it is set by hand.
   const [defaults, setDefaults] = useState<
     Omit<Style, "strokeWidth"> & { strokeWidth: number | null }
@@ -90,10 +110,11 @@ export const EditorShell = ({
   });
 
   const ready = session.state === "ready" ? session : null;
-  const name = session.state === "ready" ? session.image.name : session.name;
-  const natural =
-    session.state === "ready" ? session.image.natural : session.natural;
+  const { name, natural } = imageOf(session);
+  // While the stored annotations can't be read, the picture shows under screen 11 with none.
+  const unreadable = ready?.unreadable ?? false;
   const doc = ready?.doc ?? null;
+  const hidden = ready?.hidden ?? NONE;
   const shown = useMemo(
     () => (doc ? withoutIds(doc, hidden) : null),
     [doc, hidden],
@@ -135,7 +156,7 @@ export const EditorShell = ({
     },
     onDrawBox: () => {
       setTool("rect");
-      setNotice("Rectangle: drag across the picture to draw a box.");
+      setNotice({ text: "Rectangle: drag across the picture to draw a box." });
     },
   };
 
@@ -146,6 +167,15 @@ export const EditorShell = ({
       "color" in patch ? undefined : `${Object.keys(patch)[0]}:${selected.id}`;
     edit((d) => updateAnnotation(d, selected.id, patch), "Restyle", group);
   };
+
+  const copying = useCopy(
+    () =>
+      ready
+        ? renderPng(withoutIds(ready.doc, ready.hidden), ready.image.bitmap)
+        : Promise.reject(new Error("the image is still opening.")),
+    { name, size: natural ? sizeText(natural) : "" },
+    setNotice,
+  );
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -163,7 +193,7 @@ export const EditorShell = ({
 
   return (
     <div className="flex h-dvh min-h-[560px] flex-col">
-      <AppBar variant="app" onHome={onClose} />
+      <AppBar variant="app" onHome={onHome} />
       <main
         aria-labelledby="editor-file"
         className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)]"
@@ -181,10 +211,16 @@ export const EditorShell = ({
           redoLabel={history?.future[0]?.label ?? null}
           onUndo={editing.undo}
           onRedo={editing.redo}
+          copy={ready ? copying : null}
+          onExport={() => go(`#/annotate/${ready?.key}/export`)}
         />
         <div className="grid min-h-0 grid-cols-[minmax(0,1fr)_320px]">
           <CanvasStage
-            status={doc ? (notice ?? statusLine(doc)) : ""}
+            status={
+              doc && !unreadable
+                ? (notice ?? { text: statusLine(doc) })
+                : notice
+            }
             image={ready?.image ?? null}
             doc={shown}
             decoding={ready ? null : { name, natural }}
@@ -193,12 +229,14 @@ export const EditorShell = ({
             draft={draft}
             actions={actions}
             onZoomChange={setZoom}
-          />
+          >
+            {unreadable && <Unreadable {...recovery} />}
+          </CanvasStage>
           <aside
             aria-label="Inspector and layers"
             className="flex min-h-0 flex-col overflow-y-auto border-l bg-card"
           >
-            {ready ? (
+            {ready && !unreadable ? (
               <Inspector
                 subject={
                   selected
@@ -214,13 +252,12 @@ export const EditorShell = ({
               <div className="min-h-12 border-b" />
             )}
             <LayerList
-              layers={doc ? layerRows(doc) : null}
+              layers={doc && !unreadable ? layerRows(doc) : null}
+              unreadable={unreadable}
               hidden={hidden}
               selected={selected?.id ?? null}
               onSelect={setSelectedId}
-              onToggleHidden={(id) =>
-                setHidden((current) => toggle(current, id))
-              }
+              onToggleHidden={editing.toggleHidden}
             />
             <p className="mt-auto px-6 py-4 text-sm text-muted-foreground">
               Drag a row, or press <Kbd>⌥ ↑</Kbd>, to change what sits on top.

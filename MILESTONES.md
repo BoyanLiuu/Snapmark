@@ -20,9 +20,9 @@ decisions log.
 |                          | M5 — Rectangle, model, selection             | ✅ Done |
 |                          | M6 — Resize handles                          | ✅ Done |
 |                          | M7 — Arrow, inspector, undo                  | ✅ Done |
-|                          | M8 — Export and Copy · **MVP**               | ⏭ Next  |
-| C · Kept and addressable | M9 — The library in this browser             |         |
-|                          | M10 — Routes and dead ends                   |         |
+|                          | M8 — Export and Copy · **MVP**               | ✅ Done |
+| C · Kept and addressable | M9 — The library in this browser             | ✅ Done |
+|                          | M10 — Routes and dead ends                   | ⏭ Next  |
 | D · The learning goals   | M11 — The camera, zoom does not leak         |         |
 |                          | M12 — Highlight and the four-pass compositor |         |
 |                          | M13 — Text that exports identically          |         |
@@ -33,8 +33,8 @@ decisions log.
 |                          | M18 — Shortcuts and keyboard                 |         |
 |                          | M19 — The phone                              |         |
 
-**Last verified:** 2026-11-13, M7 — `pnpm check` green (format, typecheck, lint, 47 unit tests,
-build); `pnpm test:e2e` 44 passed (22 checks, each at 2x and 1x).
+**Last verified:** 2026-11-14, M8 and M9 — `pnpm check` green (format, typecheck, lint, 49 unit tests,
+build); `pnpm test:e2e` 64 passed (32 checks, each at 2x and 1x).
 
 ---
 
@@ -283,3 +283,57 @@ Worth a look by eye:
 - [ ] Hold ⌘Z after a few drags and watch it step back one drag at a time
 
 Commit: `arrow: shaft geometry, inspector controls and undo by operation`
+
+## M8 — Export and Copy · MVP ✅
+
+- [x] `export/render.ts`: an `OffscreenCanvas` at the natural size, identity transform,
+      `document.fonts.ready`, the same `drawScene` with `minVisualStroke: 0`, then `convertToBlob`
+- [x] `export/clipboard.ts`: `ClipboardItem` handed the PNG's promise, synchronously from the click
+- [x] Copy in the editor bar: "Copied the 3840 × 2407 PNG. Nothing was sent anywhere." (21); without
+      a secure page or `ClipboardItem` it becomes **Download PNG** and says why (22); a blocked
+      write says so in red and becomes Download PNG (23)
+- [x] The export page (25): the PNG itself as the preview with its scale, Output px, Pixels MP,
+      Budget MP, **Copy PNG** and **Download PNG**; JPEG and JSON shown, arriving in M16
+- [x] Routes for the export and the editor (pulled forward from M10): `#/annotate/:key/export`
+- [x] Check (`e2e/export.spec.ts` at 2x and 1x): the copied PNG is 3840 × 2407 at 2x too, with
+      the box's stroke on its left edge and not 12 px either side; with no `ClipboardItem` Copy
+      downloads a 3840 × 2407 PNG and says why; a blocked clipboard says so; the export page's
+      preview is the 3840 × 2407 PNG and Download saves it. Proven by mutation: an export at twice
+      the size fails at both ratios
+
+Worth a look by eye — the MVP acceptance test:
+
+- [ ] Draw a box round a known UI element on a 3840 × 2407 screenshot, export, open the PNG in
+      Preview at 100% and read its top-left: within 1 px of the editor's
+- [ ] Copy, paste into Slack: the image arrives with the box on it
+- [ ] In Safari, Copy works (if it fails, the blob was awaited)
+- [ ] Over plain `http` from another machine, Copy has become Download PNG with the reason
+
+Commit: `export: natural-size render, PNG encode and clipboard copy — MVP`
+
+## M9 — The library in this browser ✅
+
+- [x] `model/persist.ts`: IndexedDB through `idb`, images and documents keyed by the SHA-256 of
+      the bytes (`model/hash.ts`); `model/stored.ts` writes the document as plain data and refuses
+      a record it can't read
+- [x] "In this browser" under the open page (01): thumbnail, name, size, annotations, last edited,
+      **Forget**; loading skeletons (04), the empty state (05), storage blocked (06), Forget asks
+      first (07)
+- [x] A reload, or a row in the list, opens the image at `#/annotate/:key` with its annotations;
+      an address this browser doesn't have says so (32)
+- [x] Annotations unreadable (11): the picture shows dimmed, **Try again** and **Start without
+      them**, and the layers rail says why
+- [x] Saved 400 ms after the last change, and when the image closes
+- [x] Check (`src/model/stored.test.ts`, `e2e/library.spec.ts` at 2x and 1x): a document survives
+      the trip through storage and one from another version is refused; a reload brings back the
+      image and its box; the same bytes under another name open the same record and address;
+      with storage blocked an image still opens normally and the list says why; an unknown
+      address gives screen 32; Forget keeps the image until confirmed; an unreadable record gives
+      screen 11 and Start without them leaves a working editor. Proven by mutation: keying by
+      name fails the same-bytes check; blocked storage read as unreadable fails the blocked check
+
+Worth a look by eye:
+
+- [ ] Open the app in a private window: the list explains itself, images still open
+
+Commit: `library: IndexedDB store keyed by image hash, with empty, loading and blocked states`

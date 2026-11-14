@@ -3,6 +3,7 @@
 import { Eye, EyeOff, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { annotationCount } from "@/model/describe";
 import type { Id } from "@/model/types";
 import type { LayerRow } from "./layers";
 import { KIND_ICON } from "./tools";
@@ -22,8 +23,6 @@ const Skeleton = () => (
   </div>
 );
 
-const plural = (n: number) => `${n} annotation${n === 1 ? "" : "s"}`;
-
 /**
  * The layers rail: one row per annotation, top of the paint order first, with its size in image
  * px. A row selects its annotation, as a click on the canvas does; the eye hides it from the canvas.
@@ -34,9 +33,11 @@ export const LayerList = ({
   selected,
   onSelect,
   onToggleHidden,
+  unreadable = false,
 }: {
-  /** Null while the image decodes. */
+  /** Null while the image decodes, or while its annotations can't be read. */
   layers: LayerRow[] | null;
+  unreadable?: boolean;
   hidden: ReadonlySet<Id>;
   selected: Id | null;
   onSelect: (id: Id | null) => void;
@@ -53,12 +54,18 @@ export const LayerList = ({
         </h2>
         {layers && (
           <p className="text-sm text-muted-foreground">
-            {plural(layers.length)}
+            {annotationCount(layers.length)}
           </p>
         )}
       </div>
 
-      {layers === null && <Skeleton />}
+      {unreadable ? (
+        <p className="text-sm text-destructive">
+          The layers will list here once the annotations load.
+        </p>
+      ) : (
+        layers === null && <Skeleton />
+      )}
       {layers?.length === 0 && (
         <p className="py-6 text-sm text-ink-2">
           Each box, arrow and label gets a row here, top first.
