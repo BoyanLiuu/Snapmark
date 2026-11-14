@@ -34,6 +34,7 @@ Uses pnpm through corepack (`corepack enable`, or prefix each command with `core
 | `pnpm test:e2e`   | Builds to `.next-e2e`, then runs the browser checks at 2x and 1x                |
 | `pnpm test:watch` | Vitest in watch mode                                                            |
 | `pnpm format`     | Prettier, with Tailwind class sorting                                           |
+| `pnpm icons`      | Redraws `src/app/apple-icon.png` from `src/app/icon.svg`                        |
 
 Add shadcn components with `pnpm dlx shadcn@latest add <name>`, then `pnpm exec eslint --fix
 src/components/ui` to turn their `function` declarations into arrow functions.
@@ -63,7 +64,9 @@ src/
   history/undo.ts       undo by operation
   render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
                         scene.ts (drawScene, shared with the export from M8), draw/ (per kind)
-scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart)
+  app/icon.svg          the tab icon: Snapmark's mark on a 16-unit grid (apple-icon.png from it)
+scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart),
+                        make-icons.mjs
 tests/                  repo-wide architecture checks
 e2e/                    Playwright
 docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md

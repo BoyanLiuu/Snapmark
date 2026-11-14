@@ -66,3 +66,35 @@ test("no request leaves the app's own host, and Switzer loads from it", async ({
     )
     .toBe(true);
 });
+
+test("the tab icon is Snapmark's mark, served from this app", async ({
+  page,
+  request,
+}) => {
+  const icons = await page.evaluate(() =>
+    [...document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]')].map(
+      (link) => link.href,
+    ),
+  );
+  expect(icons).toHaveLength(1);
+  const response = await request.get(icons[0]);
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("image/svg+xml");
+  // Drawn at 16 px, it is the mark: the orange centre pixel on dark paper, inside the frame.
+  const drawn = await page.evaluate(async (href) => {
+    const img = new Image();
+    img.src = href;
+    await img.decode();
+    const ctx = new OffscreenCanvas(16, 16).getContext("2d")!;
+    ctx.drawImage(img, 0, 0, 16, 16);
+    const at = (x: number, y: number) =>
+      [...ctx.getImageData(x, y, 1, 1).data].slice(0, 3);
+    return { centre: at(8, 8), inside: at(8, 6), corner: at(0, 0) };
+  }, icons[0]);
+  const orange = (rgb: number[]) =>
+    rgb[0] > 200 && rgb[1] > 90 && rgb[1] < 160 && rgb[2] < 110;
+  const dark = (rgb: number[]) => rgb.every((v) => v < 40);
+  expect(orange(drawn.centre)).toBe(true);
+  expect(dark(drawn.inside)).toBe(true);
+  expect(dark(drawn.corner)).toBe(true);
+});
