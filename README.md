@@ -1,16 +1,30 @@
 # Snapmark
 
-Annotate to the pixel, then paste. Open a screenshot, draw a box or an arrow on it, and copy a PNG
-at the image's own size. Nothing leaves the browser.
+Annotate to the pixel, then paste. Open a screenshot or a photo, draw on it, and copy a PNG at the
+image's own size. Nothing leaves the browser: no account, no upload, no server.
 
-The plan and the architecture are in [`docs/`](docs/); the screens it builds to come from a
-Hallmark design file that is not in this repo yet.
+Every coordinate is stored in the source image's own pixels, so a box drawn at 25% zoom and the
+same box drawn at 400% export as the same bytes. The design it is built to comes from a Hallmark
+design file that is not in this repo; the architecture is in [`docs/`](docs/).
 
-**Status:** all of M0–M19 done. Open an image, zoom to the pixel, draw boxes, arrows,
-highlights and labels, pixelate what must not show, select several and reorder layers, undo, then
-Copy a PNG, or export a PNG, a JPEG or the annotations as JSON, at the image's own size and the same
-bytes at any zoom; warned first if anything runs past the edge, by keyboard or on a phone too.
-See [MILESTONES.md](MILESTONES.md).
+## What it does
+
+- **Six tools:** select, rectangle, arrow, highlighter (which multiplies, so what is under it stays
+  readable), text labels on a legibility plate, and a pixelate region recomputed from the original
+  on every draw, so it stays editable.
+- **Zoom to the pixel:** 10% to 800%, anchored at the pointer, with the image's pixel grid showing
+  past 200%. Space-drag, the middle button or two fingers pan.
+- **Edit what you drew:** select one or several, move, resize by eight handles, nudge by a pixel,
+  reorder the layers, hide any of them, and undo by operation — one drag, one step.
+- **Copy and export:** `⌘C` puts the PNG on the clipboard at the image's own size, or downloads it
+  where the browser has no clipboard to offer; the export page
+  also offers a JPEG, or the annotations as W3C Web Annotation JSON, which can be dropped back onto
+  the same image. Over a 64 MP budget it scales down and says so, rather than handing back a blank
+  file.
+- **Kept in this browser:** each image and its annotations are filed under the SHA-256 of its bytes
+  in IndexedDB, so opening the same file again brings its annotations back, whatever it is called.
+- **Reachable by address, keyboard and phone:** every screen has a URL, every shortcut the panel
+  lists works, and the whole loop fits a 375 px viewport by touch.
 
 ## Stack
 
@@ -43,11 +57,13 @@ src/components/ui` to turn their `function` declarations into arrow functions.
 
 ```
 src/
-  app/                  Next.js: layout, page, globals.css (the design file's tokens)
+  app/                  Next.js: layout, page, globals.css (the design file's tokens),
+                        icon.svg (the tab icon; apple-icon.png is drawn from it)
   components/ui/        shadcn primitives
   components/app.tsx    the open page, the editor or the export page, by address (use-session.ts)
   components/session-store.ts  the open image, its history, the tool and selection (Zustand)
-  components/open/      the open screen: pick, drop, paste, the hero lenses, the library (screen 32 too)
+  components/open/      the open screen: pick, drop, paste, the figure's lenses and the intro it
+                        draws on itself (intro.ts), the library, and the dead ends
   components/export/    the export page
   components/editor/    the editor: app bar, editor bar, canvas stage, inspector, layers
                         (hint.tsx: what a control does, on hover and on focus)
@@ -58,14 +74,15 @@ src/
   model/sample.ts       the sample photo (public/samples/) and its annotations
   model/persist.ts      IndexedDB: images and documents by the hash of the bytes (hash.ts, stored.ts)
   model/schema.ts       Zod schemas for annotations from outside the app, checked against their types
-  export/               render.ts (the PNG at natural size), clipboard.ts (Copy, or Download)
+  export/               render.ts (the image at natural size), clipboard.ts (Copy, or Download),
+                        limits.ts (the engines' caps), annotations.ts (the JSON)
   geom/                 matrix.ts (M, toScreen, toImage), camera.ts (fit), arrow.ts, hit.ts,
                         resize.ts, handles.ts
   interact/             machine.ts (press, move, release, preview), draft.ts (what a drag draws)
   history/undo.ts       undo by operation
   render/               view.ts (the only code that knows device pixels), loop.ts, overlay.ts,
-                        scene.ts (drawScene, shared with the export from M8), draw/ (per kind)
-  app/icon.svg          the tab icon: Snapmark's mark on a 16-unit grid (apple-icon.png from it)
+                        scene.ts (drawScene, shared with the export), draw/ (per kind)
+  lib/                  route.ts (the addresses), store.ts, animate.ts, debounce.ts, text.ts
 scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart),
                         make-icons.mjs
 tests/                  repo-wide architecture checks
