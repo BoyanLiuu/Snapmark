@@ -168,3 +168,59 @@ export const drawGutter = (
   ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
   ctx.fill("evenodd");
 };
+
+/**
+ * The pointer that annotates the open screen's figure (components/open/intro.ts): the select
+ * tool's own arrow, drawn at a constant size in screen px, and pressed while it drags.
+ */
+export const drawPointer = (
+  ctx: CanvasRenderingContext2D,
+  { camera }: Frame,
+  p: Point,
+  { pressed, alpha }: { pressed: boolean; alpha: number },
+) => {
+  const { x, y } = toScreen(camera, p);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  // Pressed: a ring around the tip, as a click looks in the design file's own cursor.
+  if (pressed) {
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(0, 17);
+  ctx.lineTo(4.4, 12.6);
+  ctx.lineTo(7.4, 19.4);
+  ctx.lineTo(10.2, 18.2);
+  ctx.lineTo(7.2, 11.4);
+  ctx.lineTo(13.4, 10.8);
+  ctx.closePath();
+  ctx.fillStyle = PAPER;
+  ctx.fill();
+  ctx.strokeStyle = "oklch(94% 0.01 80)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+};
+
+/** The caret, while the figure's label types itself: one bar at the end of what has been typed. */
+export const drawCaret = (
+  ctx: CanvasRenderingContext2D,
+  { camera }: Frame,
+  p: Point,
+  height: number,
+) => {
+  const { x, y } = toScreen(camera, p);
+  ctx.fillStyle = ACCENT;
+  ctx.fillRect(
+    Math.round(x),
+    Math.round(y),
+    2,
+    Math.max(6, height * camera.scale),
+  );
+};

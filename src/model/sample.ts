@@ -44,6 +44,15 @@ export const loadSample = async (): Promise<OpenResult> => {
     : { ok: false, reason: SAMPLE_MISSING };
 };
 
+/**
+ * The two the open screen's figure draws on itself (components/open/intro.ts): the box around the
+ * boathouse and the label above it. Named here so the figure and the sample can't drift apart.
+ */
+export const SAMPLE_IDS = {
+  boathouseBox: "Ce2Nj5Vu",
+  boathouseLabel: "Xt4Wd9Bn",
+} as const;
+
 /** Defaults for this image's width: width ÷ 400 for strokes (ARCHITECTURE.md §3). */
 const stroke = { strokeWidth: 11, opacity: 1 };
 const label = { color: "white", fontSize: 56, plate: true, ...stroke } as const;
@@ -78,7 +87,7 @@ const SAMPLE_ANNOTATIONS: Annotation[] = [
     opacity: 0.6,
   },
   {
-    id: "Ce2Nj5Vu",
+    id: SAMPLE_IDS.boathouseBox,
     kind: "rect",
     color: "orange",
     x: 150,
@@ -117,7 +126,7 @@ const SAMPLE_ANNOTATIONS: Annotation[] = [
     ...label,
   },
   {
-    id: "Xt4Wd9Bn",
+    id: SAMPLE_IDS.boathouseLabel,
     kind: "text",
     text: "Oars and life jackets in the boathouse",
     x: 190,

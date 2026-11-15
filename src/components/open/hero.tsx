@@ -3,10 +3,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { centreOn, fit } from "@/geom/camera";
 import type { Camera } from "@/geom/matrix";
+import { animate } from "@/lib/animate";
+import { createStore, type Store } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { CORNERS } from "./corners";
+import {
+  caret,
+  firstVisit,
+  INTRO_MS,
+  introDoc,
+  introPace,
+  pointer,
+} from "./intro";
 import { drawImageLayer } from "@/render/image";
-import { drawMark } from "@/render/overlay";
+import { drawCaret, drawMark, drawPointer } from "@/render/overlay";
 import { SAMPLE, SAMPLE_DOC } from "@/model/sample";
 import type { RectA } from "@/model/types";
 import type { Size } from "@/model/types";
@@ -21,12 +31,18 @@ const PIXEL = SAMPLE.pixel;
 const Lens = ({
   bitmap,
   camera,
+  intro,
+  working,
   onScale,
   className,
   children,
 }: {
   bitmap: ImageBitmap | null;
   camera: (size: ViewSize) => Camera;
+  /** Milliseconds into the intro, read on each frame (components/open/intro.ts). */
+  intro: Store<number>;
+  /** Whether to show the pointer and caret at work: the whole-image lens only. */
+  working?: boolean;
   onScale?: (scale: number) => void;
   className?: string;
   children: ReactNode;
@@ -50,9 +66,19 @@ const Lens = ({
       camera,
       drawBase: (ctx, frame) => {
         if (bitmapRef.current)
-          drawImageLayer(ctx, frame, SAMPLE_DOC, bitmapRef.current);
+          drawImageLayer(ctx, frame, introDoc(intro.get()), bitmapRef.current);
       },
-      drawOverlay: (ctx, frame) => drawMark(ctx, frame, PIXEL),
+      drawOverlay: (ctx, frame) => {
+        // The mark belongs to the photo: it waits for it.
+        if (!bitmapRef.current) return;
+        drawMark(ctx, frame, PIXEL);
+        if (!working) return;
+        const elapsed = intro.get();
+        const hand = pointer(elapsed);
+        const bar = caret(elapsed);
+        if (bar) drawCaret(ctx, frame, bar.at, bar.height);
+        if (hand) drawPointer(ctx, frame, hand.at, hand);
+      },
       onFrame: ({ camera: { scale: next } }) => {
         if (next === scale) return;
         scale = next;
@@ -61,11 +87,19 @@ const Lens = ({
     });
     viewRef.current = view;
     return () => view.dispose();
+    // Every later value reaches the frames through refs and the intro's store.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, onScale]);
+
+  // Each frame of the intro: both layers, since the pointer moves over the marks it draws.
+  useEffect(
+    () => intro.subscribe(() => viewRef.current?.invalidate()),
+    [intro],
+  );
 
   useEffect(() => {
     bitmapRef.current = bitmap;
-    viewRef.current?.invalidate("base");
+    viewRef.current?.invalidate();
   }, [bitmap]);
 
   return (
@@ -125,12 +159,28 @@ export const Hero = ({
   onOpenSample: () => void;
 }) => {
   const [fitted, setFitted] = useState<number | null>(null);
+  // Milliseconds into the intro; it starts finished, so a repeat visit simply shows the figure.
+  const [intro] = useState(() => createStore(INTRO_MS));
   // The sample's known size until it decodes, so the figure keeps its shape while it loads.
   const natural = image?.natural ?? SAMPLE.size;
   const { w, h } = natural;
   const cameras = useMemo(() => lensCameras({ w, h }), [w, h]);
   const bitmap = image?.bitmap ?? null;
   const size = `${w} × ${h}`;
+
+  // Decided on the client, before the photo lands, so the figure never shows itself finished and
+  // then start over: it waits at the beginning and annotates itself when the photo arrives.
+  const plays = useRef(false);
+  useEffect(() => {
+    plays.current = firstVisit();
+    if (plays.current) intro.set(0);
+  }, [intro]);
+  useEffect(() => {
+    if (!bitmap || !plays.current) return;
+    // The store keeps the figure's own time, so only the clock it runs on is slowed.
+    const pace = introPace();
+    return animate(INTRO_MS * pace, (ms) => intro.set(ms / pace));
+  }, [bitmap, intro]);
   return (
     <figure className="m-0 grid h-[min(calc(100dvh-56px-32px),850px)] grid-rows-[auto_minmax(140px,1fr)] gap-2 max-[60rem]:h-auto max-[60rem]:grid-rows-[auto_200px]">
       <button
@@ -146,6 +196,8 @@ export const Hero = ({
         <Lens
           bitmap={bitmap}
           camera={cameras.whole}
+          intro={intro}
+          working
           onScale={setFitted}
           className="absolute inset-0"
         >
@@ -162,7 +214,7 @@ export const Hero = ({
         </Lens>
       </button>
       <div className="grid min-h-0 grid-cols-2 gap-2 max-[40rem]:grid-cols-1">
-        <Lens bitmap={bitmap} camera={cameras.at400}>
+        <Lens bitmap={bitmap} camera={cameras.at400} intro={intro}>
           <Strip
             items={[
               ["Zoomed", "400%"],
@@ -170,7 +222,7 @@ export const Hero = ({
             ]}
           />
         </Lens>
-        <Lens bitmap={bitmap} camera={cameras.at100}>
+        <Lens bitmap={bitmap} camera={cameras.at100} intro={intro}>
           <Strip
             items={[
               ["The PNG", size],
