@@ -3,6 +3,10 @@
 Annotate to the pixel, then paste. Open a screenshot or a photo, draw on it, and copy a PNG at the
 image's own size. Nothing leaves the browser: no account, no upload, no server.
 
+![The open screen: the headline, and the sample photo annotated with a box, an arrow and two labels,
+with the view's zoom and the selected box's size and top-left corner read out beneath
+it.](docs/screenshot.webp)
+
 Every coordinate is stored in the source image's own pixels, so a box drawn at 25% zoom and the
 same box drawn at 400% export as the same bytes. The design it is built to comes from a Hallmark
 design file that is not in this repo; the architecture is in [`docs/`](docs/).
@@ -89,7 +93,7 @@ src/
 scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart),
                         make-icons.mjs
 e2e/                    Playwright
-docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md
+docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md, screenshot.webp
 ```
 
 The one rule to keep: **all annotation geometry is stored in image pixels**, and only

@@ -27,18 +27,19 @@ A resize handle is 8 CSS px whether you are at 10% or 800%. The click-vs-drag th
 
 ## 2. Stack
 
-| Concern        | Choice                                                                    | Why                                                                                                                                                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Framework      | **Next.js 16 + React 19 + TypeScript 5**, chrome built with **shadcn/ui** | Client-only. The editor is one statically prerendered page whose surface is a Client Component; there are no API routes and no server code, and adding one would be a different project. (Originally Vite 5 + React 18; see the plan's decisions log) |
-| Rendering      | **Canvas 2D**, two stacked layers                                         | The stated learning goal. Also the only surface where "export exactly what you see" is a re-render rather than a rasterisation problem                                                                                                                |
-| Transforms     | **`DOMMatrix`**                                                           | Native, has `invertSelf()` and `transformPoint()`, and the _same object_ can be fed to `ctx.setTransform()`. Hand-rolled 3×2 maths is 40 lines you then have to test                                                                                  |
-| Image decode   | **`createImageBitmap(blob, { imageOrientation: 'from-image' })`**         | Pre-decoded, so `drawImage` is a blit rather than a decode; and it is the only one-line fix for EXIF-rotated phone photos                                                                                                                             |
-| Export surface | **`OffscreenCanvas`**, falling back to a detached `<canvas>`              | Renders at natural size without ever being in the DOM, and is worker-ready if export of a 100 MP image starts janking                                                                                                                                 |
-| Encoding       | **`canvas.toBlob()`**                                                     | See §6 — async, binary, and ~33% smaller than the base64 `toDataURL` produces                                                                                                                                                                         |
-| Clipboard      | `navigator.clipboard.write([new ClipboardItem(…)])`                       | The actual product (see the business-logic insight in the plan). Note the Safari user-activation trap in §6                                                                                                                                           |
-| Persistence    | **IndexedDB** via `idb` 8                                                 | Must store an image `Blob`. `localStorage` is strings only and caps at ~5 MB — a single screenshot blows it                                                                                                                                           |
-| State          | **Zustand**                                                               | The document is a `Map`, mutated outside React. Zustand holds the UI-visible slice; putting 400 annotations in React state re-renders the tree on every pointer-move                                                                                  |
-| Backend        | **none**                                                                  | Nothing leaves the browser. An annotator that uploads your screenshots to annotate them is a worse product, and a backend adds an entire deployment to a 1–2 week build                                                                               |
+| Concern        | Choice                                                                    | Why                                                                                                                                                                                                                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Framework      | **Next.js 16 + React 19 + TypeScript 5**, chrome built with **shadcn/ui** | Client-only. The editor is one statically prerendered page whose surface is a Client Component; there are no API routes and no server code, and adding one would be a different project. (Originally Vite 5 + React 18; see the plan's decisions log)                                                                                                              |
+| Rendering      | **Canvas 2D**, two stacked layers                                         | The stated learning goal. Also the only surface where "export exactly what you see" is a re-render rather than a rasterisation problem                                                                                                                                                                                                                             |
+| Transforms     | **`DOMMatrix`**                                                           | Native, has `invertSelf()` and `transformPoint()`, and the _same object_ can be fed to `ctx.setTransform()`. Hand-rolled 3×2 maths is 40 lines you then have to test                                                                                                                                                                                               |
+| Image decode   | **`createImageBitmap(blob, { imageOrientation: 'from-image' })`**         | Pre-decoded, so `drawImage` is a blit rather than a decode; and it is the only one-line fix for EXIF-rotated phone photos                                                                                                                                                                                                                                          |
+| Export surface | **`OffscreenCanvas`**, required                                           | Renders at natural size without ever being in the DOM, and is worker-ready if export of a 100 MP image starts janking. No DOM fallback: `export/render.ts` throws "This browser has no 2D canvas to export with." rather than quietly handing back a different pipeline                                                                                            |
+| Encoding       | **`canvas.convertToBlob()`**                                              | See §6 — async, binary, and ~33% smaller than the base64 `toDataURL` produces                                                                                                                                                                                                                                                                                      |
+| Clipboard      | `navigator.clipboard.write([new ClipboardItem(…)])`                       | The actual product (see the business-logic insight in the plan). Note the Safari user-activation trap in §6                                                                                                                                                                                                                                                        |
+| Persistence    | **IndexedDB** via `idb` 8                                                 | Must store an image `Blob`. `localStorage` is strings only and caps at ~5 MB — a single screenshot blows it                                                                                                                                                                                                                                                        |
+| State          | **Zustand**                                                               | The document is a `Map`, mutated outside React. Zustand holds the UI-visible slice; putting 400 annotations in React state re-renders the tree on every pointer-move                                                                                                                                                                                               |
+| Theme          | **`data-theme` on `<html>`**, dark by default                             | The design file is dark, so dark is what a first visit gets; light is a choice, kept in this browser and set before the first paint by an inline script. Only the chrome follows it — `render/chrome.ts` reads the overlay's colours from the page's CSS variables. Annotation colours and the text plate never do, so an export is the same bytes in either theme |
+| Backend        | **none**                                                                  | Nothing leaves the browser. An annotator that uploads your screenshots to annotate them is a worse product, and a backend adds an entire deployment to a 1–2 week build                                                                                                                                                                                            |
 
 ### Contested: roll the canvas work by hand, or use a library?
 
@@ -57,64 +58,50 @@ A resize handle is 8 CSS px whether you are at 10% or 800%. The click-vs-drag th
 ## 3. Data model
 
 ```ts
-type Id = string; // nanoid(8)
+export type Id = string; // 8 hex chars from crypto.randomUUID()
 
 interface Base {
   id: Id;
-  z: number; // paint order within its pass (see §5)
-  color: string; // '#e8590c'
+  color: SwatchId; // an id from the six-swatch palette, resolved to CSS at draw time
   strokeWidth: number; // IMAGE px
   opacity: number; // 0..1
-  bbox?: Bbox; // CACHED, see below
 }
 
-interface RectA extends Base {
+export interface RectA extends Base {
   kind: "rect";
   x: number;
   y: number;
   w: number;
   h: number;
-  fill: string | null;
-  radius: number;
-}
-interface EllipseA extends Base {
-  kind: "ellipse";
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fill: string | null;
-}
-interface ArrowA extends Base {
+} // stroked only: no fill, no corner radius
+
+export interface ArrowA extends Base {
   kind: "arrow";
-  x1: number;
+  x1: number; // tail
   y1: number;
-  x2: number;
+  x2: number; // tip
   y2: number;
-  headScale: number;
-}
-interface HighlightA extends Base {
+} // head size is derived from the length, never stored
+
+export interface HighlightA extends Base {
   kind: "highlight";
   x: number;
   y: number;
   w: number;
   h: number;
 } // multiply-blended
-interface PenA extends Base {
-  kind: "pen";
-  points: number[];
-} // flat [x,y,x,y,…]
-interface TextA extends Base {
+
+export interface TextA extends Base {
   kind: "text";
-  x: number;
+  x: number; // top-left of the first line
   y: number;
   width: number; // wrap width, IMAGE px
   text: string;
   fontSize: number; // IMAGE px
-  align: "left" | "center";
   plate: boolean;
-}
-interface PixelateA extends Base {
+} // always drawn left-aligned
+
+export interface PixelateA extends Base {
   kind: "pixelate";
   x: number;
   y: number;
@@ -123,33 +110,43 @@ interface PixelateA extends Base {
   block: number;
 }
 
-type Annotation =
-  RectA | EllipseA | ArrowA | HighlightA | PenA | TextA | PixelateA;
+export type Annotation = RectA | ArrowA | HighlightA | TextA | PixelateA;
 
-interface Doc {
-  imageHash: string; // SHA-256 of the source bytes — the primary key
+export interface Doc {
   naturalWidth: number;
   naturalHeight: number;
-  byId: Map<Id, Annotation>;
-  order: Id[]; // z-order, bottom to top
+  byId: ReadonlyMap<Id, Annotation>;
+  order: readonly Id[]; // paint order, bottom to top
+  openedAt: Date;
+  editedAt: Date | null; // null until something is drawn
 }
 ```
+
+**Five kinds, and six tools** — select plus one per kind. The document holds no `z` (paint order is
+`Doc.order` alone), no cached `bbox`, and no image hash: the hash is the IndexedDB key, not part of
+the document. Colour is a palette id rather than a CSS string, so a swatch can be redefined — or a
+theme added — without rewriting stored annotations.
 
 Four decisions worth stating:
 
 - **Every number above is image px, and they are floats.** Rounding geometry to integers on write looks tidy and is a bug: at 26% zoom one screen pixel is 3.8 image pixels, so rounding quantises every drag to a 4-pixel grid and the user cannot nudge. Round only for display in the inspector.
 - **`strokeWidth` and `fontSize` are image px, not screen px.** This is the uncomfortable half of the invariant: a 2 px stroke on a 3840 px-wide screenshot is a hairline. The fix is a sensible _default_ derived from the image — `max(2, round(naturalWidth / 400))`, so 10 px on a 4K screenshot and 2 px on a 800 px thumbnail — not a change of units. If stroke width were stored in screen px, the exported line thickness would depend on the zoom at which it was drawn.
-- **`bbox` is denormalised onto the annotation and invalidated on mutation.** Hit testing, marquee selection, and the out-of-bounds check all need it, and for `TextA` computing it requires a full `measureText` wrap pass. Recomputing that 60 times a second during a drag is the one thing in this app that will actually show up in a profile.
+- **`bbox` is computed on demand, not stored.** `model/bbox.ts` derives it per call; the only cache in the drawing path is the text-width memo in `render/text-layout.ts`, keyed by `font|text`. Denormalising the box onto the annotation was the plan, and it was dropped: it has to be invalidated on every mutation, and the measured cost of recomputing never showed up in a profile. The one genuinely expensive case — `TextA`, which needs a `measureText` wrap pass — is covered by that width cache.
 - **`order` is a separate array, not a sort on `z`.** Bring-forward is then an array splice instead of a renumber of every annotation. The same reason the whiteboard project (11) uses a `Y.Array`.
 
 ### Persistence
 
 Two IndexedDB stores, both keyed by `imageHash = SHA-256(bytes)` via `crypto.subtle.digest`:
 
+```ts
+// model/persist.ts
+images: { hash, name, natural: Size, blob, thumb: Blob, sample: boolean, addedAt };
+// model/stored.ts — order is the array's own order; no separate field
+docs: { hash, schemaVersion, annotations, openedAt, editedAt };
 ```
-images:  { hash, blob, naturalWidth, naturalHeight, addedAt }
-docs:    { hash, order, annotations[], updatedAt, schemaVersion }
-```
+
+The image store keeps the filename and a thumbnail so the library can list what is in this browser
+without decoding every image, and a `sample` flag so the bundled sample is never offered as yours.
 
 Keying on a content hash rather than a filename means dropping the same screenshot again restores the annotations you already made on it, and renaming the file does not orphan them. Writes are debounced 400 ms; the image blob is written once.
 
@@ -185,7 +182,16 @@ ctx.setTransform(
 );
 ```
 
-**The sharpest edge in the project is that these are two different matrices.** The transform handed to `ctx.setTransform` includes `dpr`; the one used to interpret pointer events must not, because `clientX` is already in CSS px. Use the device matrix for hit testing on a Retina display and every click lands at half the intended position — a bug that is invisible on an external 1× monitor and reproduces 100% on the laptop screen. Hence: `setTransform` is called in exactly one function, `render/view.ts`, and `M` is the only matrix exported.
+**The sharpest edge in the project is that these are two different matrices.** The transform handed to `ctx.setTransform` includes `dpr`; the one used to interpret pointer events must not, because `clientX` is already in CSS px. Use the device matrix for hit testing on a Retina display and every click lands at half the intended position — a bug that is invisible on an external 1× monitor and reproduces 100% on the laptop screen. Hence, inside the annotation path: `setTransform` is called in exactly one function,
+`render/view.ts`, and that file is the only reader of `devicePixelRatio`. `geom/matrix.ts` exports
+`M` for image→screen; `view.ts` keeps the device matrix to itself.
+
+A decorative canvas outside `src/render` may manage its own transform — the hero wordmark
+(`components/open/tech-text.tsx`) does, and draws no annotations. This used to be enforced by a grep
+test in `tests/`; that test was deleted when the wordmark arrived, so the rule is now a convention
+held by hand. If it is ever broken inside `src/render`, `src/geom`, `src/export`, `src/model` or
+`src/interact`, the symptom is a click landing at half its intended position on a Retina screen and
+nowhere else.
 
 Canvas sizing follows from the same rule:
 
@@ -229,19 +235,25 @@ Two decisions in the zoom behaviour:
 
 ```
 ┌─ overlay canvas ── redrawn every frame during an interaction ──────────────┐
-│  selection outline · 8 resize handles · marquee · in-progress draft        │
-│  crosshair guides · out-of-bounds gutter · remote-free, purely ephemeral   │
-├─ base canvas ───── redrawn only when the doc or the camera changes ────────┤
+│  selection outline · handles · marquee · size tag · pointer crosshair      │
+│  out-of-bounds gutter · purely ephemeral, never exported                   │
+├─ base canvas ───── the doc, the camera, or the drag in progress ───────────┤
 │  pass 1: drawImage(bitmap, 0, 0)                                           │
 │  pass 2: pixelate regions   (read-back + nearest-neighbour upscale)        │
 │  pass 3: highlights         (globalCompositeOperation = 'multiply')        │
-│  pass 4: rect / ellipse / arrow / pen / text  (source-over, in `order`)    │
+│  pass 4: rect / arrow / text         (source-over, in `order`)             │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Four passes, not one, because of `multiply`.** A highlight drawn with `source-over` and 35% alpha washes out the text underneath; drawn with `multiply` it behaves like a real marker and the text stays readable. But `multiply` composites against everything already on the canvas — so a highlight drawn after an arrow would darken the arrow. Putting all highlights in a pass of their own, before the opaque annotations, fixes it. Pleasant side effect: multiply is commutative, so z-order _within_ the highlight pass is genuinely irrelevant and need not be maintained.
 
 `pixelate` must come before the highlights because it reads back pixels: `ctx.drawImage(src, sx,sy,sw,sh, 0,0, sw/block, sh/block)` into a scratch canvas, then draw that back up over the region with smoothing off. Read-back after annotations are drawn would pixelate the annotations too.
+
+**The in-progress draft is on the _base_ canvas, not the overlay.** A drag builds a whole preview
+document (`previewRef` in `components/editor/canvas-stage.tsx`) and the base scene is drawn from
+`preview ?? doc`, so what you see mid-drag goes through exactly the same `drawScene` as the committed
+result — the draft cannot look different from what you get. The cost is that a draw or move drag
+re-renders the base every frame; only a hover or a selection change is overlay-only.
 
 **No dirty rectangles.** Clearing a 1440×900 canvas, blitting a decoded `ImageBitmap`, and drawing 50 annotations costs ~3–5 ms. Dirty-rect bookkeeping would be premature here, and it is the thing most likely to produce smear artefacts. The two-canvas split is kept for a different reason: during a drag the overlay changes every frame while the base does not, and redrawing the base at 60 fps for the sake of eight handles is pure waste.
 
@@ -313,7 +325,7 @@ Browsers cap canvas dimensions and total area, and they do it by throwing nothin
 | Safari desktop        | 16,384                         | ~268 MP         |
 | Safari iOS            | 4,096–8,192 (device-dependent) | ~16–64 MP       |
 
-So a 12000×9000 photo (108 MP) exports fine on desktop Chrome and silently produces an empty PNG on an iPad. The exporter therefore (a) probes by allocating and reading back one pixel, and (b) applies a 64 MP budget: above it, export downscales by `sqrt(budget / area)` and says so in the dialog with the resulting dimensions, rather than failing or lying. The _view_ always works from a bitmap downscaled to at most 2× the viewport, so display is never the bottleneck — only export deals in full resolution.
+So a 12000×9000 photo (108 MP) exports fine on desktop Chrome and silently produces an empty PNG on an iPad. The exporter therefore reads a per-platform cap rather than probing for one — `export/limits.ts` sniffs iOS (including an iPad that calls itself a Mac, via `maxTouchPoints`) and applies **64 MP / 16,384 px** on desktop or **16 MP / 4,096 px** on iOS — then scales the whole scene to fit and says so on the export page. A 108 MP image exports at 0.341× ≈ 4096×3072 on an iPad. The _view_ draws the same full-resolution bitmap through the camera: there is no downscaled display copy, because `drawImage` of a decoded `ImageBitmap` is a blit and the camera already clips what is off-screen.
 
 ## 7. Geometry: arrows, hit testing, resize handles
 
@@ -324,7 +336,9 @@ The naive arrowhead offsets the head points by a fixed ±dx/±dy, which skews on
 ```ts
 const ang = Math.atan2(y2 - y1, x2 - x1);
 const len = Math.hypot(x2 - x1, y2 - y1);
-const head = clamp(len * 0.28, 4 * sw, 10 * sw); // image px; never longer than ~28% of the shaft
+// image px. The length/2 ceiling is what stops a short arrow being mostly head:
+// below ~14 strokes the 4*sw floor would otherwise win.
+const head = Math.min(Math.max(len * 0.28, 4 * sw), 10 * sw, len / 2);
 const SPREAD = Math.PI / 7; // 25.7°, constant at every length
 
 const hx1 = x2 - head * Math.cos(ang - SPREAD),
@@ -348,26 +362,30 @@ A reverse-order scan over `order` — topmost first, return on the first hit. At
 ```ts
 const tol = 6 / cam.scale;        // 6 CSS px expressed in image px — recomputed, never stored
 
-rect      : on the frame if |dist to any edge| <= tol + sw/2; inside only if fill !== null
-ellipse   : |(dx/rx)² + (dy/ry)² − 1| small, scaled by tol; inside if filled
-arrow/pen : min point-to-segment distance <= tol + sw/2
-highlight : inside the rect (highlights are always "filled")
-text      : inside the wrapped bbox (the plate rect when plate === true)
+rect              : on the frame if |dist to any edge| <= tol + sw/2. Frame only,
+                    always — a rect has no fill to be inside of
+arrow             : point-to-segment distance <= tol + sw/2
+highlight/pixelate: inside the box
+text              : inside the wrapped bbox (the plate rect when plate === true)
 ```
 
-The `tol = 6 / cam.scale` line is the second-order rule from §1 in one expression: the user's finger is 6 screen pixels wide regardless of zoom.
+`tol` is `6 / cam.scale`, multiplied by `TOUCH_SLOP = 2.5` when the pointer is a finger. It is the second-order rule from §1 in one expression: the user's finger is 6 screen pixels wide regardless of zoom.
 
 ### Resize handles
 
-Eight handles, no rotation. Rotation is deliberately out of scope — it multiplies every hit test by an inverse-rotation step and is not what screenshot annotation needs.
+Eight handles on a box; an arrow gets two (its tail and tip) and a label gets one (its right edge,
+which sets the wrap width). No rotation. Rotation is deliberately out of scope — it multiplies every hit test by an inverse-rotation step and is not what screenshot annotation needs.
 
 ```ts
-function resize(
-  start: Rect,
-  handle: Handle,
+// `reshape()` in geom/handles.ts is the per-kind entry point; `resize()` is the box case.
+// It returns the handle as well as the box: drag past an edge and the handle you are
+// holding becomes its mirror, which the caller has to keep hold of (see below).
+export const resize = (
+  start: Box,
+  handle: BoxHandle,
   p: Point,
-  keepAspect: boolean,
-): Rect {
+  keepAspect = false,
+): { box: Box; handle: BoxHandle } => {
   let x = start.x,
     y = start.y,
     x2 = start.x + start.w,
@@ -392,7 +410,7 @@ function resize(
     /* grow the smaller axis to match start.w / start.h */
   }
   return { x, y, w, h };
-}
+};
 ```
 
 The non-obvious part is `flipH()` / `flipV()`: when the rectangle inverts, **the handle you are dragging becomes the opposite handle**. Without mirroring the live handle identity, continuing the same drag past the flip point moves the box in the wrong direction and the cursor shape is wrong. This is the single fiddliest function in the project; write it with a test table before wiring it to a pointer.
@@ -403,7 +421,7 @@ Handle _rendering_ and handle _hit regions_ are both 8 CSS px on the overlay can
 
 Canvas has no text layout engine. Three problems, three decisions:
 
-**Measurement.** `ctx.measureText` is unaffected by the active transform — it reports in the units of `ctx.font`. So setting `ctx.font = \`${a.fontSize}px ${STACK}\``with`fontSize`in image px yields measurements in image px, which is exactly what the model wants. Height comes from`m.actualBoundingBoxAscent + m.actualBoundingBoxDescent`, falling back to `fontSize * 1.2` where those are missing. Measurement happens on a single shared offscreen context so the view and the export measure identically.
+**Measurement.** `ctx.measureText` is unaffected by the active transform — it reports in the units of `ctx.font`. So setting `ctx.font = \`${a.fontSize}px ${STACK}\``with`fontSize`in image px yields measurements in image px, which is exactly what the model wants. Line height is **not** measured: `render/text-layout.ts`uses a fixed`LINE = 1.25`multiple of`fontSize`, so the editing textarea's CSS `line-height` can be given the identical number and the two agree exactly. Measuring ascent and descent per line would be more faithful to the font and impossible to match in CSS. Measurement happens on a single shared offscreen context so the view and the export measure identically.
 
 **Wrapping.** Greedy word wrap against `a.width`, with a memo cache keyed by `` `${font}|${text}` ``:
 
@@ -422,9 +440,9 @@ const widthOf = (ctx, s: string) => {
 
 A single `measureText` is only ~2–5 µs, but a 40-word paragraph re-wrapped every frame during a drag is ~10 k calls/second for no reason. The cache makes text annotations free to drag.
 
-**Legibility.** Annotation text sits on arbitrary photos, so any fixed colour is unreadable against roughly half of them. Each text annotation optionally paints a **background plate**: a rounded rect at the wrapped bbox inflated by `fontSize * 0.35`, filled `rgba(0,0,0,0.72)` with white text (or the inverse). This is why the wrapped height must be _computed_ rather than estimated — the plate has to match the text it sits behind, at export resolution.
+**Legibility.** Annotation text sits on arbitrary photos, so any fixed colour is unreadable against roughly half of them. Each text annotation optionally paints a **background plate**: a square rect at the wrapped bbox inflated by `fontSize * 0.35` (`PLATE_PAD`), filled `oklch(9% 0.008 75 / 0.74)`, with the text in the annotation's own swatch colour — the white swatch by default. The plate is deliberately the same in both themes: it is part of the annotation, so it goes into the export, and an export must not depend on which theme drew it. This is why the wrapped height must be _computed_ rather than estimated — the plate has to match the text it sits behind, at export resolution.
 
-**Editing uses a DOM `<textarea>`, not an in-canvas caret.** Positioned with `toScreen`, sized `fontSize * cam.scale`, transparent background, and on blur it writes the string to the model and the canvas re-renders canonically. Implementing a caret, selection, double-click word select, and IME composition on a canvas is multiple weeks of work; Figma did it and wrote a long post about why it was hard. The honest cost of the overlay: the browser's own wrapping inside the textarea will not agree with `wrapText()` to the pixel, so the text can reflow slightly on commit. Mitigated by giving the textarea the identical font stack, `width: a.width * scale`, and matching `line-height`; accepted as a sub-pixel discrepancy that resolves the moment editing ends.
+**Editing uses a DOM `<textarea>`, not an in-canvas caret.** Positioned with `toScreen`, sized `fontSize * cam.scale`, transparent background, and on blur it writes the string to the model and the canvas re-renders canonically. Implementing a caret, selection, double-click word select, and IME composition on a canvas is multiple weeks of work; Figma did it and wrote a long post about why it was hard. The honest cost of the overlay: the browser's own wrapping inside the textarea will not agree with `layoutText()` to the pixel, so the text can reflow slightly on commit. Mitigated by giving the textarea the identical font stack, `width: a.width * scale`, and matching `line-height`; accepted as a sub-pixel discrepancy that resolves the moment editing ends.
 
 **Fonts must be loaded before any measurement.** If `measureText` runs against a fallback while a webfont is still loading, the preview wraps one way and the export wraps another. Two mitigations, both cheap: use a system font stack (no loading at all), and `await document.fonts.ready` before the export render regardless.
 
@@ -467,55 +485,110 @@ The changed annotations rather than document snapshots, because a snapshot of ev
 
 ## 10. Project layout
 
+Unit tests sit next to what they test (`geom/matrix.test.ts` beside `geom/matrix.ts`); the browser
+checks are all in `e2e/`.
+
 ```
 src/
   model/
     types.ts          # the annotation union. Comment at the top: ALL geometry is image space
     doc.ts            # Map<Id,Annotation> + order[]; the only place annotations are mutated
     bbox.ts           # per-kind bbox INCLUDING stroke, arrowhead spread, wrapped text, plate
-    persist.ts        # IndexedDB; image blob + doc keyed by SHA-256 of the source bytes
-    stored.ts         # the doc as stored, and refused if this version can't read it
+    palette.ts        # the six swatches; annotations store the id, not the colour
+    image.ts          # format from the first 32 bytes, decode upright, refusals by name
+    hash.ts           # SHA-256 of the source bytes, and the short key used in addresses
+    persist.ts        # IndexedDB: images and docs keyed by that hash
+    stored.ts         # the doc as stored, refused if this version can't read it
+    schema.ts         # Zod schemas for annotations from outside the app (dropped JSON)
+    sample.ts         # the bundled sample photo and its annotations
+    describe.ts       # the words for a kind, a count, a tag
   geom/
     matrix.ts         # DOMMatrix build/invert, toImage/toScreen. BUILD AND TEST THIS FIRST
-    camera.ts         # fit(), zoomAt() cursor-anchored, pan, clamp, 1:1
-    hit.ts            # reverse-order scan; tol = 6 / scale
+    camera.ts         # fit(), cursor-anchored zoom, pan, clamp 10%–800%, pinch
+    hit.ts            # reverse-order scan; tol = 6 / scale, ×2.5 for touch
+    handles.ts        # which handles a kind has, and reshape() per kind
     resize.ts         # handle anchors, negative-size flip + live-handle mirroring, shift-aspect
     arrow.ts          # head angle/length/clamp and the shaft shortening
   render/
     scene.ts          # drawScene() — THE shared function; view and export both call it
-    draw/{rect,ellipse,arrow,highlight,pen,text,pixelate}.ts
-    text-layout.ts    # measureText cache, greedy wrap, plate geometry
+    draw/
+      shapes.ts       # rect, arrow, highlight
+      text.ts         # the plate and the lines
+      pixelate.ts     # read back, nearest-neighbour upscale
+    text-layout.ts    # measureText cache, greedy wrap, LINE = 1.25, plate geometry
     view.ts           # two canvases, DPR sizing, the ONLY call to ctx.setTransform
-    overlay.ts        # selection, 8 handles, marquee, draft, out-of-bounds gutter
+    loop.ts           # the rAF dirty-flag loop
+    overlay.ts        # selection, handles, marquee, size tag, crosshair, gutter
+    chrome.ts         # the overlay's colours, read from the page so they follow the theme
+    image.ts          # the base layer: the bitmap through the camera
+    thumb.ts          # the library's thumbnails
   export/
-    render.ts         # OffscreenCanvas at natural size, identity transform, fonts.ready, convertToBlob
-    encode.ts         # PNG vs JPEG, 64 MP budget + downscale notice (M16)
+    render.ts         # OffscreenCanvas at natural size, identity transform, fonts.ready,
+                      # convertToBlob; PNG and JPEG with a quality
     clipboard.ts      # ClipboardItem given a blob PROMISE (Safari activation)
-    limits.ts         # per-engine canvas caps + the 1px allocation probe
+    limits.ts         # per-platform caps, the fit to budget, and the taint probe
+    annotations.ts    # the document as W3C Web Annotation JSON
   interact/
-    machine.ts        # the state machine above; 3 CSS px threshold
-    tools/{select,rect,ellipse,arrow,highlight,pen,text,pixelate}.ts
-    text-overlay.ts   # the positioned <textarea>
+    machine.ts        # the state machine above; 3 CSS px threshold. One machine, no per-tool files
+    draft.ts          # what a drag draws, and the defaults derived from the image
   history/
     undo.ts           # undo by operation: what each change touched, 100 entries
-  components/         # §10's `ui/` in the Next.js build
-    ui/               # shadcn primitives (button, …)
-    editor/           # canvas-stage.tsx, then toolbar, inspector, layer-list, export-dialog, zoom-bar, dropzone
-  app/                # Next.js: layout.tsx, page.tsx, globals.css
+  lib/
+    theme.ts          # dark or light on <html>, set before the first paint
+    route.ts          # the hash addresses and their query state
+    store.ts          # createStore for per-frame values React must not re-render on
+    animate.ts        # reducedMotion(), and a rAF loop that ends
+    debounce.ts       # the 400 ms save
+    text.ts, set.ts, typing.ts, use-ref-value.ts, utils.ts
+  components/
+    app.tsx           # the open page, the editor or the export page, by address
+    use-session.ts    # opening, storing and restoring the session
+    session-store.ts  # the open image, its history, the tool and selection (Zustand)
+    ui/               # shadcn primitives (button, slider, tooltip, …)
+    open/             # the open screen: open-screen, hero + intro, tech-text (the wordmark),
+                      # library, use-image-input (picker, whole-page drop, paste), dead-ends
+    editor/           # canvas-stage, editor-shell, editor-bar, app-bar, inspector, layer-list,
+                      # text-editor (the positioned <textarea>), shortcuts, status, theme-toggle
+    export/           # export-page: the format, the preview, Copy and Download
+  app/                # Next.js: layout.tsx, page.tsx, globals.css (the design tokens), icon.svg
+  assets/fonts/       # Switzer, fetched by scripts/fetch-fonts.mjs and never committed
+e2e/                  # Playwright, run at 2× and 1×
+scripts/              # fetch-fonts, make-fixtures (the e2e images), make-icons
 ```
 
 ## 11. Failure modes
 
-| Failure                                                                 | Behaviour                                                                                                                                                                                    |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 12000×9000 (108 MP) image exported on iPad Safari                       | Allocation probe fails the 64 MP budget; export downscales by `sqrt(64/108)` and the dialog states the real output size. Never a blank PNG                                                   |
-| EXIF-rotated phone photo                                                | `createImageBitmap(blob, { imageOrientation: 'from-image' })` normalises at decode, so image space matches what the user sees. Without it, every annotation lands rotated 90° in the export  |
-| HEIC / AVIF / TIFF upload                                               | `createImageBitmap` rejects; the dropzone reports the codec and asks for PNG/JPEG/WebP rather than showing an empty canvas                                                                   |
-| Image loaded from a cross-origin URL without CORS (P2)                  | Canvas is tainted and `convertToBlob` throws `SecurityError`. Detected at load with a 1 px `getImageData` probe; export is disabled with the reason shown, not left to fail at the last step |
-| `navigator.clipboard.write` unsupported, or the page is on plain `http` | Copy button is replaced by Download, with a one-line explanation. It never silently no-ops                                                                                                   |
-| Annotation dragged outside the image bounds                             | The view shows a dimmed out-of-bounds gutter and a badge; the export canvas is exactly the natural size, so the part outside is clipped. Surfacing it beforehand is the whole point          |
-| A webfont is still loading when export runs                             | `await document.fonts.ready` first; otherwise the export wraps text differently from the preview and nobody can explain why                                                                  |
-| Zoomed to 800% and dragging                                             | Geometry is float, so no quantisation. The overlay clear region is inflated by `sw/2 + handle size` or handles leave trails                                                                  |
-| 1,500 annotations                                                       | Full base redraw ~18 ms. The `measureText` cache matters more than the draw calls; a soft warning past 800 and layer-list virtualisation                                                     |
-| Tab refreshed or crashed mid-session                                    | IndexedDB restores the doc by image hash on next load; the debounced write means at most 400 ms of edits are lost                                                                            |
-| Degenerate arrow (pointer-down and up in the same place)                | `len < 2 * sw` is discarded on commit rather than stored as a zero-length arrow that cannot be selected or resized                                                                           |
+| Failure                                                                 | Behaviour                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12000×9000 (108 MP) image exported on iPad Safari                       | The iOS caps (16 MP, 4,096 px a side) are applied up front; the export scales by 0.341 to ≈4096×3072 and the dialog states the real output size. Never a blank PNG                                                            |
+| EXIF-rotated phone photo                                                | `createImageBitmap(blob, { imageOrientation: 'from-image' })` normalises at decode, so image space matches what the user sees. Without it, every annotation lands rotated 90° in the export                                   |
+| HEIC / AVIF / TIFF upload                                               | The first 32 bytes are sniffed and the format refused by name before any decode; the help line names the codec and asks for PNG/JPEG/WebP rather than showing an empty canvas                                                 |
+| Image loaded from a cross-origin URL without CORS (P2)                  | Canvas is tainted and `convertToBlob` throws `SecurityError`. Detected on the export page with a 1 px `getImageData` probe; export is disabled with the reason shown, not left to fail at the last step                       |
+| `navigator.clipboard.write` unsupported, or the page is on plain `http` | Copy button is replaced by Download, with a one-line explanation. It never silently no-ops                                                                                                                                    |
+| Annotation dragged outside the image bounds                             | The view shows a dimmed out-of-bounds gutter and a badge; the export canvas is exactly the natural size, so the part outside is clipped. Surfacing it beforehand is the whole point                                           |
+| A webfont is still loading when export runs                             | `await document.fonts.ready` first; otherwise the export wraps text differently from the preview and nobody can explain why                                                                                                   |
+| Zoomed to 800% and dragging                                             | Geometry is float, so no quantisation. The overlay is cleared in full every frame, so there is no clear-region bookkeeping to get wrong                                                                                       |
+| 1,500 annotations                                                       | Full base redraw ~18 ms. The `measureText` cache matters more than the draw calls. Neither a soft warning nor layer-list virtualisation was built: the list renders every row, and nothing counts annotations against a limit |
+| Tab refreshed or crashed mid-session                                    | IndexedDB restores the doc by image hash on next load; the debounced write means at most 400 ms of edits are lost                                                                                                             |
+| Degenerate arrow (pointer-down and up in the same place)                | `len < 2 * sw` is discarded on commit rather than stored as a zero-length arrow that cannot be selected or resized                                                                                                            |
+
+## 12. Deployment
+
+Deployed on **Vercel** from `main`, with the Next.js preset and the repository root as the root
+directory. There is nothing to configure beyond that:
+
+- **No environment variables.** Nothing in `src/` reads `process.env`, there is no `.env`, no
+  database and no auth. The only build-time variable the repo knows about is `NEXT_DIST_DIR`, which
+  Playwright sets so its build never overwrites the real one.
+- **The build reaches the network once, for the font.** `pnpm build` runs
+  `scripts/fetch-fonts.mjs` before `next build`, which downloads Switzer from Fontshare into a
+  git-ignored directory — the licence permits self-hosting but not redistribution, so the files
+  cannot be committed. The script exits non-zero on failure, which fails the deploy; that is
+  deliberate, since the alternative is shipping a page in a fallback font. It is the first thing to
+  check if a build that previously passed starts failing.
+- **Node.** `engines.node` is `>=24`, an open range, so Vercel resolves it to the newest major it
+  offers rather than to 24 itself. Nothing of ours runs on Node in production — there is no server —
+  so the version only affects `next build` and the font fetch. Pin it to `24.x` to make the build
+  match a developer's machine exactly.
+- **pnpm.** Vercel picks the version from `lockfileVersion: 9.0`, not from the `packageManager`
+  field, which it reads only with Corepack enabled. Both read this lockfile.
