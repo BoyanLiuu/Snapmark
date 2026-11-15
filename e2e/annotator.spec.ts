@@ -57,7 +57,7 @@ test("going back while an image decodes drops it", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("an image with nothing drawn says so, and Draw a box picks the rectangle", async ({
+test("an image with nothing drawn says so, and nothing covers it", async ({
   page,
 }) => {
   await page.goto("/");
@@ -65,11 +65,9 @@ test("an image with nothing drawn says so, and Draw a box picks the rectangle", 
     .locator('input[type="file"]')
     .setInputFiles(join(import.meta.dirname, "files", "one-pixel.png"));
   await expect(page.getByText(/^1\s×\s1\spx$/)).toBeVisible();
-  const plate = page.getByTestId("nothing-drawn");
-  await expect(plate).toContainText("Nothing drawn on this image yet");
   await expect(status(page)).toHaveText(
     /^Nothing drawn yet\. Opened \d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2} UTC\.$/,
   );
-  await plate.getByRole("button", { name: "Draw a box" }).click();
-  await expect(page.getByRole("radio", { name: "Rectangle" })).toBeChecked();
+  // The status line is the whole of it: an empty image is shown, not explained over.
+  await expect(page.getByTestId("stage").getByRole("heading")).toHaveCount(0);
 });

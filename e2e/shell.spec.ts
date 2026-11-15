@@ -21,7 +21,6 @@ test("Copy is the editor bar's one orange button, and Export is not", async ({
   const orange = await background("Copy");
   expect(orange).not.toBe("rgba(0, 0, 0, 0)");
   expect(await background("Export")).toBe("rgba(0, 0, 0, 0)");
-  // The empty state's "Draw a box" is orange too, as in the design; the rule is the bar's.
   const filled = await page
     .getByTestId("editor-bar")
     .getByRole("button")

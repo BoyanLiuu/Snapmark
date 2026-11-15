@@ -215,10 +215,6 @@ export const EditorShell = ({
       edit((d) => removeAnnotations(d, new Set(selection)), "Delete");
       actions.select([]);
     },
-    onDrawBox: () => {
-      actions.setTool("rect");
-      setNotice({ text: "Rectangle: drag across the picture to draw a box." });
-    },
     onWrite: (at) => {
       if (natural)
         setWriting({ fresh: labelAt(at, natural.w, style, newId()) });

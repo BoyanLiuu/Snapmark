@@ -10,7 +10,6 @@ import {
   type ReactNode,
   type Ref,
 } from "react";
-import { Button } from "@/components/ui/button";
 import { pinched, type Zoom } from "@/geom/camera";
 import { toImage, type Camera } from "@/geom/matrix";
 import {
@@ -56,7 +55,6 @@ import {
   drawSelection,
 } from "@/render/overlay";
 import { createView, type View, type ViewStats } from "@/render/view";
-import { Kbd } from "./kbd";
 import { RenderReadout, useDebug } from "./render-readout";
 import { placeTextEditor, TextEditor } from "./text-editor";
 import { useCamera, type StageCamera } from "./use-camera";
@@ -112,28 +110,6 @@ const DecodingPlate = ({
   </div>
 );
 
-/** Screen 10. The pointer passes through all but the button, so drawing works under it. */
-const EmptyPlate = ({ onDrawBox }: { onDrawBox: () => void }) => (
-  <div
-    data-testid="nothing-drawn"
-    className="pointer-events-none absolute bottom-10 left-1/2 z-10 grid w-[min(30rem,calc(100%-48px))] -translate-x-1/2 justify-items-center gap-2 border bg-background/80 p-10 text-center"
-  >
-    <h2 className="text-[1.44rem] leading-[1.05] font-medium tracking-[-0.04em]">
-      Nothing drawn on this image yet
-    </h2>
-    <p className="text-sm text-ink-2">
-      Drag across the picture with a tool. Rectangle is <Kbd>R</Kbd>.
-    </p>
-    <Button
-      size="control"
-      className="pointer-events-auto mt-2"
-      onClick={onDrawBox}
-    >
-      Draw a box
-    </Button>
-  </div>
-);
-
 export interface Writing {
   annotation: TextA;
   onDone: (text: string | null) => void;
@@ -145,7 +121,6 @@ export interface StageActions {
   onMove: (ids: Id[], dx: number, dy: number) => void;
   onReshape: (changes: Change[]) => void;
   onDelete: () => void;
-  onDrawBox: () => void;
   /** The text tool pressed on empty ground. */
   onWrite: (at: Point) => void;
   /** A label double-clicked. */
@@ -637,9 +612,6 @@ export const CanvasStage = ({
           onMouseDown={(event) => event.preventDefault()}
         />
         {decoding && <DecodingPlate {...decoding} />}
-        {image && doc && doc.order.length === 0 && !cover && (
-          <EmptyPlate onDrawBox={actions.onDrawBox} />
-        )}
         {writing && (
           <TextEditor
             key={writing.annotation.id}

@@ -50,7 +50,9 @@ test("with storage blocked, an image still opens and the list says why it's empt
   );
   await openChart(page);
   // Not screen 11: nothing is stored, so there is nothing that failed to read.
-  await expect(page.getByTestId("nothing-drawn")).toBeVisible();
+  await expect(page.getByTestId("status-strip").getByRole("status")).toHaveText(
+    /^Nothing drawn yet\. Opened /,
+  );
   await toImages(page);
   await expect(
     page.getByRole("heading", { name: "The list didn’t load" }),
