@@ -93,7 +93,7 @@ src/
 scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart),
                         make-icons.mjs
 e2e/                    Playwright
-docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md, screenshot.webp
+docs/                   ARCHITECTURE.md, screenshot.webp
 ```
 
 The one rule to keep: **all annotation geometry is stored in image pixels**, and only

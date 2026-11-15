@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * Every screen has an address (IMPLEMENTATION_PLAN.md M10): the page in the path, the state in
+ * Every screen has an address: the page in the path, the state in
  * the query. `/annotate/` with anything but a 12-digit key is an image this browser can't have
  * (screen 32); any other unknown path is screen 33.
  */

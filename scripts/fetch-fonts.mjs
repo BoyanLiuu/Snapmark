@@ -4,7 +4,7 @@
  * Switzer's licence (ITF Free Font License 2.0) allows self-hosting it for this app but not making
  * the files available through a repository, so they are downloaded before `dev` and `build`
  * rather than committed. next/font/local then serves them from this app: no font request goes to
- * a third-party host at runtime. See the decisions log in docs/IMPLEMENTATION_PLAN.md.
+ * a third-party host at runtime.
  */
 
 import { access, mkdir, writeFile } from "node:fs/promises";

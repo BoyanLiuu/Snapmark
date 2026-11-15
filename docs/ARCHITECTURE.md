@@ -1,7 +1,6 @@
 # Architecture — Image Annotation Tool
 
 > Project 21 · Frontend · 1–2 weeks · ~20 h/week
-> Read `IMPLEMENTATION_PLAN.md` for scope tiers and build order.
 
 ## 1. The core problem
 
