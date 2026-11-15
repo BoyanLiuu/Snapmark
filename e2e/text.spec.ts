@@ -51,6 +51,8 @@ test("the text tool writes a label; double-click edits it in place, and Esc leav
   await expect(page).toHaveURL(/[?&]edit=[0-9a-f]{8}/);
   await page.reload();
   await expect(editor(page)).toHaveValue("Taxi in the bus lane");
+  // It takes focus on the frame that places it; typing before that would go nowhere.
+  await expect(editor(page)).toBeFocused();
   await page.keyboard.type(" and more");
   await page.keyboard.press("Escape");
   await expect(editor(page)).toHaveCount(0);
