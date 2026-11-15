@@ -118,3 +118,36 @@ test("the sample opens from this app, credited, its annotations drawn; hiding on
   await page.getByRole("button", { name: "Hide Orange rectangle" }).click();
   await expect.poll(painted).toBeLessThan(shown * 0.1);
 });
+
+/**
+ * The headline writes itself a word at a time (components/open/tech-text.tsx). With motion turned
+ * down it has to be there at once instead — and the first render cannot read the preference, so
+ * this is also the check that it is not read before hydration: the fixture fails on the mismatch.
+ */
+test.describe("with motion turned down", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  test("the headline is drawn whole, not written", async ({ page }) => {
+    await page.goto("/");
+    const lines = page.locator("h1 canvas");
+    await expect(lines).toHaveCount(3);
+    await expect(
+      page.getByRole("heading", { level: 1, name: /^Annotate to the pixel/ }),
+    ).toBeVisible();
+    // Every line has painted by the time the slowest of them would still have been writing.
+    const painted = () =>
+      lines.evaluateAll(
+        (canvases) =>
+          canvases.filter((canvas) => {
+            const c = canvas as HTMLCanvasElement;
+            const ctx = c.getContext("2d");
+            if (!ctx || c.width < 2) return false;
+            const { data } = ctx.getImageData(0, 0, c.width, c.height);
+            for (let i = 3; i < data.length; i += 4)
+              if (data[i] > 8) return true;
+            return false;
+          }).length,
+      );
+    await expect.poll(painted).toBe(3);
+  });
+});

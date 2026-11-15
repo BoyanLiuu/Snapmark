@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { reducedMotion } from "@/lib/animate";
 import { cn } from "@/lib/utils";
 import { forced, type Route } from "@/lib/route";
 import { refusalOf, type LoadedImage } from "@/model/image";
@@ -16,6 +17,15 @@ import { useImageInput } from "./use-image-input";
 
 /** The headline, a line to a canvas. The reader hears the whole sentence from the `sr-only` copy. */
 const HEADLINE = ["Annotate", "to the pixel,", "then paste"];
+/** Seconds a word spends under the selection frame as the headline is placed. */
+const WORD_SECONDS = 0.5;
+/** A word takes as long whichever line it is on, so a line's share is its own word count. */
+const LINE_SECONDS = HEADLINE.map(
+  (line) => line.split(" ").length * WORD_SECONDS,
+);
+const LINE_START = LINE_SECONDS.map((_, i) =>
+  LINE_SECONDS.slice(0, i).reduce((total, seconds) => total + seconds, 0),
+);
 
 /**
  * Screen 01: open an image by choosing it, dropping it anywhere on the page (screen 02) or pasting
@@ -37,6 +47,24 @@ export const OpenScreen = ({
   const pickerRef = useRef<HTMLInputElement>(null);
   const chooseRef = useRef<HTMLButtonElement>(null);
   const [hero, setHero] = useState<LoadedImage | null>(null);
+  /**
+   * How many of the headline's lines are writing themselves. A line mounts when its turn comes, so
+   * the frame walks one line's words at a time instead of all three at once; the empty box keeps
+   * its height, so nothing moves when the next one arrives. It starts at none on both the server
+   * and the client, because the first render has no way to know the motion preference.
+   */
+  const [writing, setWriting] = useState(0);
+
+  useEffect(() => {
+    // With reduced motion every line arrives at once, and each draws itself solid without an intro.
+    const timers = HEADLINE.map((_, i) =>
+      setTimeout(
+        () => setWriting(i + 1),
+        reducedMotion() ? 0 : LINE_START[i] * 1000,
+      ),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   // The figure's own copy of the sample; the editor decodes its own, so each closes what it made.
   useEffect(() => {
@@ -80,7 +108,7 @@ export const OpenScreen = ({
                   Annotate to the pixel, then paste
                 </span>
                 <span aria-hidden className="grid">
-                  {HEADLINE.map((line) => (
+                  {HEADLINE.map((line, i) => (
                     /*
                      * TechText fits the type to 66% of its box's height, so each line is given the
                      * room its 4.3rem needs rather than a font size of its own: one `fontSize`,
@@ -92,14 +120,22 @@ export const OpenScreen = ({
                       key={line}
                       className="-ml-[5.3%] h-[6.2rem] w-[105.3%] max-[75rem]:h-[5.15rem] max-[40rem]:h-[3.6rem]"
                     >
-                      <TechText
-                        text={line}
-                        align="left"
-                        fontSize={69}
-                        fontWeight={500}
-                        letterSpacing={-0.04}
-                        sweep={false}
-                      />
+                      {i < writing && (
+                        <TechText
+                          text={line}
+                          align="left"
+                          fontSize={69}
+                          fontWeight={500}
+                          letterSpacing={-0.04}
+                          sweep={false}
+                          // The per-letter readout is drawn above the frame, where the box the
+                          // type needs leaves no room for it, so it would be clipped.
+                          labels={false}
+                          unit="word"
+                          intro="type"
+                          introDuration={LINE_SECONDS[i]}
+                        />
+                      )}
                     </span>
                   ))}
                 </span>

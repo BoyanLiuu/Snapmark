@@ -43,6 +43,8 @@ type Glyph = {
   cells: Cell[] | null;
   assembled: number;
   index: number;
+  /** Which word of the wordmark this letter is in, for `unit="word"`. */
+  word: number;
   fill: Sprite;
   dashes: Sprite;
 };
@@ -82,6 +84,11 @@ export interface TechTextProps {
   lineStyle?: "dashed" | "solid";
   /** `area` fades letters to outlines in a circle; `letter` turns only the active one. */
   reveal?: "area" | "letter" | "off";
+  /**
+   * What the frame selects and the intro places at a time: one letter, or a whole word. A label
+   * names the first letter of what is framed, so it reads best with `unit="letter"`.
+   */
+  unit?: "letter" | "word";
   /** Tiny squares that blink around the active letter; 0 turns them off. */
   specks?: number;
   selection?: boolean;
@@ -153,6 +160,7 @@ export const TechText = ({
   strokeWidth = 1.5,
   lineStyle = "dashed",
   reveal = "letter",
+  unit = "letter",
   specks = 15,
   selection = true,
   labels = true,
@@ -190,6 +198,7 @@ export const TechText = ({
       strokeWidth,
       lineStyle,
       reveal,
+      unit,
       specks,
       selection,
       labels,
@@ -410,11 +419,20 @@ export const TechText = ({
       const previous = glyphs;
       glyphs = [];
       let prefix = "";
+      let wordIndex = 0;
+      let spaced = false;
       chars.forEach((char, i) => {
         prefix += char;
         const own = probe.measureText(char);
         const gx = x + probe.measureText(prefix).width - own.width;
-        if (!char.trim()) return;
+        if (!char.trim()) {
+          spaced = true;
+          return;
+        }
+        if (spaced) {
+          spaced = false;
+          if (glyphs.length > 0) wordIndex++;
+        }
         const base = {
           char,
           x: gx,
@@ -437,6 +455,7 @@ export const TechText = ({
           cells: null,
           assembled: 0,
           index: i,
+          word: wordIndex,
           fill: sprite(s, next, base, false, ink),
           dashes: sprite(s, next, base, true, ink),
         });
@@ -1024,18 +1043,28 @@ export const TechText = ({
         moving = true;
       });
 
+      // What the frame selects and the intro places at a time: a letter each, or a whole word.
+      const units: number[][] = [];
+      const unitOf: number[] = [];
+      glyphs.forEach((glyph, i) => {
+        const id = s.unit === "word" ? glyph.word : i;
+        unitOf[i] = id;
+        (units[id] ??= []).push(i);
+      });
+
       let typing = -1;
       if (introducing && introKind === "type") {
-        const step = 0.86 / glyphs.length;
+        const step = 0.86 / units.length;
         const cursorAt = Math.min(
-          glyphs.length - 1,
+          units.length - 1,
           Math.floor(progress / step),
         );
         typing = progress < 0.93 ? cursorAt : -1;
         glyphs.forEach((glyph, i) => {
-          if (i < cursorAt) glyph.shown = 1;
-          else if (i === cursorAt)
-            glyph.shown = smoothstep(0, step * 0.3, progress - i * step);
+          const u = unitOf[i];
+          if (u < cursorAt) glyph.shown = 1;
+          else if (u === cursorAt)
+            glyph.shown = smoothstep(0, step * 0.3, progress - u * step);
           else glyph.shown = 0;
         });
       } else {
@@ -1046,43 +1075,55 @@ export const TechText = ({
 
       let focus = -1;
       if (introducing) focus = typing;
-      else if (dragging >= 0) focus = dragging;
-      else if (active) focus = glyphAt(lens.x, lens.y);
-      if (focus >= 0 && s.selection) {
-        const glyph = glyphs[focus];
-        const bx1 = glyph.box.x1 + glyph.offset.x - 6;
-        const by1 = glyph.box.y1 + glyph.offset.y - 6;
-        const bx2 = glyph.box.x2 + glyph.offset.x + 6;
-        const by2 = glyph.box.y2 + glyph.offset.y + 6;
+      else if (dragging >= 0) focus = unitOf[dragging];
+      else if (active) {
+        const at = glyphAt(lens.x, lens.y);
+        focus = at < 0 ? -1 : unitOf[at];
+      }
+      const members = focus >= 0 ? (units[focus] ?? []) : [];
+      if (members.length > 0 && s.selection) {
+        // The frame holds everything in the unit, so a word is framed whole.
+        let bx1 = Infinity;
+        let by1 = Infinity;
+        let bx2 = -Infinity;
+        let by2 = -Infinity;
+        for (const i of members) {
+          const glyph = glyphs[i];
+          bx1 = Math.min(bx1, glyph.box.x1 + glyph.offset.x - 6);
+          by1 = Math.min(by1, glyph.box.y1 + glyph.offset.y - 6);
+          bx2 = Math.max(bx2, glyph.box.x2 + glyph.offset.x + 6);
+          by2 = Math.max(by2, glyph.box.y2 + glyph.offset.y + 6);
+        }
         if (frame.index < 0 || frame.alpha < 0.02) {
           frame.x1 = bx1;
           frame.y1 = by1;
           frame.x2 = bx2;
           frame.y2 = by2;
         }
-        const glide = focus === dragging ? 0.02 : 0.08;
+        const glide = members.includes(dragging) ? 0.02 : 0.08;
         frame.x1 = approach(frame.x1, bx1, dt, glide);
         frame.y1 = approach(frame.y1, by1, dt, glide);
         frame.x2 = approach(frame.x2, bx2, dt, glide);
         frame.y2 = approach(frame.y2, by2, dt, glide);
-        frame.index = focus;
+        frame.index = members[0];
       }
       frame.alpha = approach(
         frame.alpha,
-        focus >= 0 && s.selection ? 1 : 0,
+        members.length > 0 && s.selection ? 1 : 0,
         dt,
         0.1,
       );
 
       glyphs.forEach((glyph, i) => {
+        const u = unitOf[i];
         let target = 0;
         if (introducing)
           target =
             introKind === "type" &&
-            (i === typing || (typing >= 0 && i > typing))
+            (u === typing || (typing >= 0 && u > typing))
               ? 1
               : 0;
-        else if (s.reveal === "letter" && i === focus && i !== dragging)
+        else if (s.reveal === "letter" && u === focus && i !== dragging)
           target = 1;
         if (introducing && glyph.shown === 0) glyph.outline = target;
         glyph.outline = approach(glyph.outline, target, dt, 0.09);
