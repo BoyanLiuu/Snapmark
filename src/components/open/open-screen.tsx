@@ -11,7 +11,11 @@ import { Kbd } from "../editor/kbd";
 import { Hero } from "./hero";
 import { Library } from "./library";
 import { SampleCredit } from "./sample-credit";
+import { TechText } from "./tech-text";
 import { useImageInput } from "./use-image-input";
+
+/** The headline, a line to a canvas. The reader hears the whole sentence from the `sr-only` copy. */
+const HEADLINE = ["Annotate", "to the pixel,", "then paste"];
 
 /**
  * Screen 01: open an image by choosing it, dropping it anywhere on the page (screen 02) or pasting
@@ -71,8 +75,34 @@ export const OpenScreen = ({
         <div className="grid min-h-[calc(100dvh-56px)] items-center border-b py-4 max-[60rem]:min-h-0 max-[60rem]:py-6">
           <div className="mx-auto grid w-full max-w-[1440px] grid-cols-[minmax(0,23rem)_minmax(0,1fr)] items-center gap-8 px-16 max-[60rem]:grid-cols-1 max-[60rem]:px-6 max-[40rem]:px-4">
             <div className="grid content-center gap-6">
-              <h1 className="max-w-[11ch] text-[4.3rem] leading-[1.02] font-medium tracking-[-0.04em] text-balance max-[75rem]:text-[3.583rem] max-[40rem]:text-[2.488rem]">
-                Annotate to the pixel, then&nbsp;paste
+              <h1>
+                <span className="sr-only">
+                  Annotate to the pixel, then paste
+                </span>
+                <span aria-hidden className="grid">
+                  {HEADLINE.map((line) => (
+                    /*
+                     * TechText fits the type to 66% of its box's height, so each line is given the
+                     * room its 4.3rem needs rather than a font size of its own: one `fontSize`,
+                     * and the box's height at each width lands it on the design's type ramp.
+                     * It also insets a left-aligned wordmark by 5% of its own width, so the box is
+                     * widened by that much and pulled back, to start where the paragraph does.
+                     */
+                    <span
+                      key={line}
+                      className="-ml-[5.3%] h-[6.2rem] w-[105.3%] max-[75rem]:h-[5.15rem] max-[40rem]:h-[3.6rem]"
+                    >
+                      <TechText
+                        text={line}
+                        align="left"
+                        fontSize={69}
+                        fontWeight={500}
+                        letterSpacing={-0.04}
+                        sweep={false}
+                      />
+                    </span>
+                  ))}
+                </span>
               </h1>
               <p className="max-w-[30ch] text-[1.2rem] text-ink-2">
                 Draw on a screenshot or a photo, then copy it at full size.

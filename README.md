@@ -88,14 +88,15 @@ src/
   lib/                  route.ts (the addresses), store.ts, animate.ts, debounce.ts, text.ts
 scripts/                fetch-fonts.mjs, make-fixtures.mjs (the e2e/files images and test chart),
                         make-icons.mjs
-tests/                  repo-wide architecture checks
 e2e/                    Playwright
 docs/                   IMPLEMENTATION_PLAN.md, ARCHITECTURE.md
 ```
 
 The one rule to keep: **all annotation geometry is stored in image pixels**, and only
-`src/render/view.ts` knows about device pixels. `tests/architecture.test.ts` fails if a canvas
-transform or `devicePixelRatio` appears anywhere else.
+`src/render/view.ts` knows about device pixels — anything else that folds in the pixel ratio is the
+bug that reproduces on a Retina laptop and nowhere else. It is a rule to hold by hand: the grep
+test that enforced it was removed when the hero's wordmark (`components/open/tech-text.tsx`, which
+draws no annotations) brought its own canvas transform.
 
 ## Credits
 
