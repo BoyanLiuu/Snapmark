@@ -23,6 +23,9 @@ design file that is not in this repo; the architecture is in [`docs/`](docs/).
   file.
 - **Kept in this browser:** each image and its annotations are filed under the SHA-256 of its bytes
   in IndexedDB, so opening the same file again brings its annotations back, whatever it is called.
+- **Dark or light:** the design is dark and that is what you get until you switch, in the app bar;
+  the choice is kept. Only the chrome changes — the annotations and their plates are content, so an
+  export is the same bytes either way.
 - **Reachable by address, keyboard and phone:** every screen has a URL, every shortcut the panel
   lists works, and the whole loop fits a 375 px viewport by touch.
 

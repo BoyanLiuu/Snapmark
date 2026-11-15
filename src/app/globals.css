@@ -3,9 +3,14 @@
 @import "shadcn/tailwind.css";
 
 /*
- * Snapmark is dark-only, so there is no light theme and no `.dark` class. The shadcn variables below
- * are the design file's tokens (hallmark/tokens.css, app.css) mapped onto shadcn's names; the few
- * with no shadcn equivalent keep the design file's own names (paper-3, ink-2, muted-2, rule-2).
+ * The shadcn variables below are the design file's tokens (hallmark/tokens.css, app.css) mapped
+ * onto shadcn's names; the few with no shadcn equivalent keep the design file's own names
+ * (paper-3, ink-2, muted-2, rule-2).
+ *
+ * The design file is dark, so dark is what `:root` holds and what a first visit gets; light is
+ * the same hues read the other way, under `[data-theme="light"]` (lib/theme.ts sets the attribute
+ * before the first paint). The six annotation colours and the plate behind a label are the same
+ * in both: they are content, and they go into the export.
  */
 
 @theme inline {
@@ -89,10 +94,43 @@
   --swatch-green: oklch(74% 0.17 150);
   --swatch-sky: oklch(74% 0.12 250);
   --swatch-white: oklch(97% 0.006 80);
+  /* A chip's own edge, so the white swatch is still a square on a pale card. */
+  --swatch-edge: color-mix(in oklab, var(--background) 30%, transparent);
   /* The dimmed page under a file being dragged in. */
   --veil: oklch(6.5% 0.007 75 / 0.72);
   /* Square corners everywhere, as in the design file. */
   --radius: 0;
+}
+
+/*
+ * Light: the same hues at the other end of the lightness scale. The orange stays, since it is the
+ * product's one accent; the ring and the warnings darken so they read on paper.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: oklch(97.5% 0.004 75);
+  --card: oklch(94.5% 0.005 75);
+  --popover: oklch(94.5% 0.005 75);
+  --paper-3: oklch(89% 0.006 75);
+  --foreground: oklch(22% 0.012 75);
+  --card-foreground: oklch(22% 0.012 75);
+  --popover-foreground: oklch(22% 0.012 75);
+  --ink-2: oklch(38% 0.012 78);
+  --muted-foreground: oklch(50% 0.012 78);
+  --muted-2: oklch(66% 0.01 78);
+  --primary: oklch(66% 0.18 45);
+  --primary-foreground: oklch(98% 0.01 45);
+  --ring: oklch(58% 0.18 45);
+  --rule-2: oklch(92% 0.005 78);
+  --border: oklch(80% 0.008 78);
+  --input: oklch(80% 0.008 78);
+  --accent-foreground: oklch(22% 0.012 75);
+  --destructive: oklch(52% 0.19 27);
+  --info: oklch(50% 0.13 250);
+  --success: oklch(52% 0.13 150);
+  --swatch-edge: color-mix(in oklab, var(--foreground) 30%, transparent);
+  /* A dark scrim either way: a pale one over a pale page sets nothing apart. */
+  --veil: oklch(30% 0.01 75 / 0.4);
 }
 
 @layer base {

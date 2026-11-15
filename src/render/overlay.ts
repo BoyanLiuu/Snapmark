@@ -7,12 +7,9 @@ import { toScreen } from "@/geom/matrix";
 import { HANDLE_SIZE } from "@/geom/handles";
 import type { Box } from "@/model/bbox";
 import type { Point } from "@/model/types";
+import { chrome } from "./chrome";
 import type { Frame } from "./view";
 
-const GUIDE = "oklch(50% 0.01 80)";
-const ACCENT = "oklch(72% 0.17 45)";
-const ACCENT_INK = "oklch(10% 0.02 45)";
-const PAPER = "oklch(9% 0.008 75)";
 const TAG_FONT = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
 
 /** A coordinate on the centre of a device pixel, so a one-device-pixel line is a hairline. */
@@ -27,7 +24,7 @@ export const drawOverlay = (
   if (!pointer) return;
   const x = hairline(pointer.x, size.dpr);
   const y = hairline(pointer.y, size.dpr);
-  ctx.strokeStyle = GUIDE;
+  ctx.strokeStyle = chrome().guide;
   ctx.lineWidth = 1 / size.dpr;
   ctx.beginPath();
   ctx.moveTo(x, 0);
@@ -47,7 +44,7 @@ export const drawMark = (
   p: Point,
 ) => {
   const { x, y } = toScreen(camera, p);
-  ctx.strokeStyle = ACCENT;
+  ctx.strokeStyle = chrome().accent;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(x - 5, y - 5, 10, 10);
   ctx.beginPath();
@@ -76,7 +73,8 @@ export const drawSelection = (
     return { x: hairline(s.x, size.dpr), y: hairline(s.y, size.dpr) };
   };
   const points = handles.map((p) => toScreen(camera, p));
-  ctx.strokeStyle = ACCENT;
+  const { accent, accentInk, paper } = chrome();
+  ctx.strokeStyle = accent;
 
   let mid: number;
   let bottom: number;
@@ -92,7 +90,7 @@ export const drawSelection = (
     bottom = Math.max(...points.map((p) => p.y));
   }
 
-  ctx.fillStyle = PAPER;
+  ctx.fillStyle = paper;
   ctx.lineWidth = 1;
   for (const c of points) {
     const left = Math.round(c.x - HANDLE_SIZE / 2);
@@ -105,9 +103,9 @@ export const drawSelection = (
   const w = Math.ceil(ctx.measureText(tag).width) + 12;
   const h = 20;
   const top = Math.round(bottom + HANDLE_SIZE);
-  ctx.fillStyle = ACCENT;
+  ctx.fillStyle = accent;
   ctx.fillRect(Math.round(mid - w / 2), top, w, h);
-  ctx.fillStyle = ACCENT_INK;
+  ctx.fillStyle = accentInk;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(tag, mid, top + h / 2);
@@ -122,7 +120,7 @@ export const drawMember = (
   const a = toScreen(camera, { x: box.x, y: box.y });
   const b = toScreen(camera, { x: box.x + box.w, y: box.y + box.h });
   ctx.save();
-  ctx.strokeStyle = ACCENT;
+  ctx.strokeStyle = chrome().accent;
   ctx.lineWidth = 1 / size.dpr;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(
@@ -142,9 +140,10 @@ export const drawMarquee = (
 ) => {
   const a = toScreen(camera, { x: box.x, y: box.y });
   const b = toScreen(camera, { x: box.x + box.w, y: box.y + box.h });
-  ctx.fillStyle = "oklch(72% 0.17 45 / 0.08)";
+  const { accent, marquee } = chrome();
+  ctx.fillStyle = marquee;
   ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
-  ctx.strokeStyle = ACCENT;
+  ctx.strokeStyle = accent;
   ctx.lineWidth = 1 / size.dpr;
   ctx.strokeRect(
     hairline(a.x, size.dpr),
@@ -162,7 +161,7 @@ export const drawGutter = (
 ) => {
   const a = toScreen(camera, { x: 0, y: 0 });
   const b = toScreen(camera, { x: natural.w, y: natural.h });
-  ctx.fillStyle = "oklch(6.5% 0.007 75 / 0.72)";
+  ctx.fillStyle = chrome().gutter;
   ctx.beginPath();
   ctx.rect(0, 0, size.cssW, size.cssH);
   ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y);
@@ -180,12 +179,13 @@ export const drawPointer = (
   { pressed, alpha }: { pressed: boolean; alpha: number },
 ) => {
   const { x, y } = toScreen(camera, p);
+  const { accent, ink, paper } = chrome();
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(x, y);
   // Pressed: a ring around the tip, as a click looks in the design file's own cursor.
   if (pressed) {
-    ctx.strokeStyle = ACCENT;
+    ctx.strokeStyle = accent;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(0, 0, 9, 0, Math.PI * 2);
@@ -200,9 +200,9 @@ export const drawPointer = (
   ctx.lineTo(7.2, 11.4);
   ctx.lineTo(13.4, 10.8);
   ctx.closePath();
-  ctx.fillStyle = PAPER;
+  ctx.fillStyle = paper;
   ctx.fill();
-  ctx.strokeStyle = "oklch(94% 0.01 80)";
+  ctx.strokeStyle = ink;
   ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.restore();
@@ -216,7 +216,7 @@ export const drawCaret = (
   height: number,
 ) => {
   const { x, y } = toScreen(camera, p);
-  ctx.fillStyle = ACCENT;
+  ctx.fillStyle = chrome().accent;
   ctx.fillRect(
     Math.round(x),
     Math.round(y),

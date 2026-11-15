@@ -126,7 +126,7 @@ const Swatches = ({
           key={id}
           value={id}
           aria-label={label}
-          className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_30%,transparent)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
+          className={`size-8 min-w-8 p-0 shadow-[inset_0_0_0_1px_var(--swatch-edge)] transition-transform hover:-translate-y-px data-[state=on]:outline-2 data-[state=on]:outline-offset-3 data-[state=on]:outline-primary data-[state=on]:outline-solid ${SWATCH_CLASS[id]}`}
         />
       ))}
     </ToggleGroup>

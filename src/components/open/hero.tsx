@@ -5,6 +5,7 @@ import { centreOn, fit } from "@/geom/camera";
 import type { Camera } from "@/geom/matrix";
 import { animate } from "@/lib/animate";
 import { createStore, type Store } from "@/lib/store";
+import { onThemeChange } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { CORNERS } from "./corners";
 import {
@@ -101,6 +102,9 @@ const Lens = ({
     bitmapRef.current = bitmap;
     viewRef.current?.invalidate();
   }, [bitmap]);
+
+  // Dark or light: the pointer and the crosshair take their colour from the page.
+  useEffect(() => onThemeChange(() => viewRef.current?.invalidate()), []);
 
   return (
     <div

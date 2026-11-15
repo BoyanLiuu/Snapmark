@@ -38,6 +38,7 @@ import {
 } from "@/interact/machine";
 import { createStore, type Store } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { onThemeChange } from "@/lib/theme";
 import { isTyping } from "@/lib/typing";
 import { useRefValue } from "@/lib/use-ref-value";
 import { extentOf, outline, union, type Box } from "@/model/bbox";
@@ -332,6 +333,9 @@ export const CanvasStage = ({
     // Draw one frame so the readout has numbers as soon as it appears.
     if (debug) viewRef.current?.invalidate("overlay");
   }, [debug]);
+
+  // Dark or light: the chrome's colours come from the page, so both canvases are drawn again.
+  useEffect(() => onThemeChange(() => viewRef.current?.invalidate()), []);
 
   const pointerAt = (
     event: MouseEvent<HTMLCanvasElement>,

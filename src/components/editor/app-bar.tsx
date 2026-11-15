@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Shortcuts } from "./shortcuts";
+import { ThemeToggle } from "./theme-toggle";
 import { Mark } from "./tools";
 
 /**
@@ -35,7 +36,8 @@ export const AppBar = ({
         Snapmark
       </a>
       {variant === "app" && (
-        <nav aria-label="App">
+        // On a phone the bar is full: the wordmark leads to the same place as this link.
+        <nav aria-label="App" className="max-[26rem]:hidden">
           <a
             href="#/"
             onClick={home}
@@ -47,6 +49,7 @@ export const AppBar = ({
       )}
       {variant !== "bare" && (
         <div className="ml-auto flex items-center gap-3">
+          <ThemeToggle />
           <Button
             variant="outline"
             size="control"
