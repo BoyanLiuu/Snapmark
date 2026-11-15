@@ -21,6 +21,7 @@ test("Copy is the editor bar's one orange button, and Export is not", async ({
   const orange = await background("Copy");
   expect(orange).not.toBe("rgba(0, 0, 0, 0)");
   expect(await background("Export")).toBe("rgba(0, 0, 0, 0)");
+  // Scoped to the bar: the inspector's orange swatch is the accent itself, the same colour.
   const filled = await page
     .getByTestId("editor-bar")
     .getByRole("button")
