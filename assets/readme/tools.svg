@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="176" viewBox="0 0 1200 176"
+     role="img" aria-labelledby="tools-title tools-desc">
+  <title id="tools-title">The six tools and their keys</title>
+  <desc id="tools-desc">Select (V), Rectangle (R), Arrow (A), Highlight (H), Text (T) and Pixelate (P) — one key each.</desc>
+
+  <rect width="1200" height="176" fill="#0a0807"/>
+
+  <g stroke="#26231e" stroke-width="1">
+    <path d="M227.5 36V146"/>
+    <path d="M405.5 36V146"/>
+    <path d="M584.5 36V146"/>
+    <path d="M762.5 36V146"/>
+    <path d="M941.5 36V146"/>
+  </g>
+
+  <g id="icons" fill="none" stroke="#cecac3" stroke-width="1.5"
+     stroke-linecap="square" stroke-linejoin="miter">
+    <!-- select -->
+    <g transform="translate(64 40) scale(1.25)">
+      <path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/>
+    </g>
+    <!-- rectangle -->
+    <g transform="translate(243 40) scale(1.25)">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+    </g>
+    <!-- arrow -->
+    <g transform="translate(421 40) scale(1.25)">
+      <path d="M7 7h10v10"/>
+      <path d="M7 17 17 7"/>
+    </g>
+    <!-- highlight -->
+    <g transform="translate(600 40) scale(1.25)">
+      <path d="m9 11-6 6v3h9l3-3"/>
+      <path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>
+    </g>
+    <!-- text -->
+    <g transform="translate(779 40) scale(1.25)">
+      <path d="M12 4v16"/>
+      <path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2"/>
+      <path d="M9 20h6"/>
+    </g>
+    <!-- pixelate -->
+    <g transform="translate(957 40) scale(1.25)">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M3 9h18"/>
+      <path d="M3 15h18"/>
+      <path d="M9 3v18"/>
+      <path d="M15 3v18"/>
+    </g>
+  </g>
+
+  <g id="names" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+     font-size="21" fill="#efebe4">
+    <text x="64" y="104">Select</text>
+    <text x="243" y="104">Rectangle</text>
+    <text x="421" y="104">Arrow</text>
+    <text x="600" y="104">Highlight</text>
+    <text x="779" y="104">Text</text>
+    <text x="957" y="104">Pixelate</text>
+  </g>
+
+  <g id="keys">
+    <g fill="#15120f" stroke="#2b2721" stroke-width="1">
+      <rect x="64" y="118" width="32" height="28"/>
+      <rect x="243" y="118" width="32" height="28"/>
+      <rect x="421" y="118" width="32" height="28"/>
+      <rect x="600" y="118" width="32" height="28"/>
+      <rect x="779" y="118" width="32" height="28"/>
+      <rect x="957" y="118" width="32" height="28"/>
+    </g>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+       font-size="18" fill="#9c9890" text-anchor="middle">
+      <text x="80" y="138">V</text>
+      <text x="259" y="138">R</text>
+      <text x="437" y="138">A</text>
+      <text x="616" y="138">H</text>
+      <text x="795" y="138">T</text>
+      <text x="973" y="138">P</text>
+    </g>
+  </g>
+</svg>
